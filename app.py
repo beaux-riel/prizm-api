@@ -147,7 +147,7 @@ def get_prizm_code(postal_code):
             # Wait for the search input to be available
             try:
                 search_input = WebDriverWait(driver, 15).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='search']"))
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".postal-lookup-field--hero"))
                 )
                 
                 # Enter the postal code
