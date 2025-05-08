@@ -41,25 +41,35 @@ driver = None
 def get_driver():
     global driver
     if driver is None:
-        # For this environment, just use the mock driver
-        logger.warning("Using mock driver for testing purposes")
-        return MockDriver()
-        
-        # The following code is commented out due to version compatibility issues
-        # try:
-        #     chrome_options = get_chrome_options()
-        #     # Try to use ChromeDriverManager to get the right driver
-        #     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-        # except Exception as e:
-        #     logger.error(f"Error initializing ChromeDriver: {str(e)}")
-        #     # Fallback to direct Chrome initialization
-        #     try:
-        #         driver = webdriver.Chrome(options=chrome_options)
-        #     except Exception as e2:
-        #         logger.error(f"Error with fallback Chrome initialization: {str(e2)}")
-        #         # Mock the driver for testing
-        #         logger.warning("Using mock driver for testing purposes")
-        #         return MockDriver()
+        try:
+            chrome_options = get_chrome_options()
+            
+            # Check for environment variables that might be set in Docker
+            chrome_path = os.environ.get('CHROME_BIN')
+            chromedriver_path = os.environ.get('CHROMEDRIVER_PATH')
+            
+            if chrome_path:
+                chrome_options.binary_location = chrome_path
+            
+            # Try to initialize the driver
+            if chromedriver_path and os.path.exists(chromedriver_path):
+                # Use the specified ChromeDriver path
+                driver = webdriver.Chrome(
+                    service=Service(chromedriver_path),
+                    options=chrome_options
+                )
+            else:
+                # Use ChromeDriverManager to get the right driver
+                driver = webdriver.Chrome(
+                    service=Service(ChromeDriverManager().install()),
+                    options=chrome_options
+                )
+                
+        except Exception as e:
+            logger.error(f"Error initializing ChromeDriver: {str(e)}")
+            # Fallback to mock driver for testing
+            logger.warning("Using mock driver for testing purposes")
+            return MockDriver()
     return driver
 
 # Mock classes for testing when Chrome is not available
