@@ -2,6 +2,7 @@ import os
 import time
 import json
 import logging
+import re
 from flask import Flask, request, jsonify, render_template
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -9,9 +10,12 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
 from webdriver_manager.chrome import ChromeDriverManager
 from concurrent.futures import ThreadPoolExecutor
+
+# Import scrape_logic functions
+from scrape_logic import validate_postal_code, get_segment_number, process_postal_codes
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
@@ -21,19 +25,26 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Configure Chrome options for headless operation
-def get_chrome_options():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
+def get_chrome_options(headless=True):
+    options = webdriver.ChromeOptions()
+    if headless:
+        options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-notifications")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
     # Enable CORS
-    chrome_options.add_argument("--disable-web-security")
-    chrome_options.add_argument("--allow-running-insecure-content")
+    options.add_argument("--disable-web-security")
+    options.add_argument("--allow-running-insecure-content")
     # Add user agent to avoid detection
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
-    return chrome_options
+    options.add_argument(
+        "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    )
+    return options
 
 # Initialize the Chrome driver once and reuse it
 driver = None
@@ -42,28 +53,30 @@ def get_driver():
     global driver
     if driver is None:
         try:
-            chrome_options = get_chrome_options()
+            options = get_chrome_options()
             
             # Check for environment variables that might be set in Docker
             chrome_path = os.environ.get('CHROME_BIN')
             chromedriver_path = os.environ.get('CHROMEDRIVER_PATH')
             
             if chrome_path:
-                chrome_options.binary_location = chrome_path
+                options.binary_location = chrome_path
             
             # Try to initialize the driver
             if chromedriver_path and os.path.exists(chromedriver_path):
                 # Use the specified ChromeDriver path
                 driver = webdriver.Chrome(
                     service=Service(chromedriver_path),
-                    options=chrome_options
+                    options=options
                 )
             else:
                 # Use ChromeDriverManager to get the right driver
                 driver = webdriver.Chrome(
                     service=Service(ChromeDriverManager().install()),
-                    options=chrome_options
+                    options=options
                 )
+            
+            driver.set_window_size(1920, 1080)
                 
         except Exception as e:
             logger.error(f"Error initializing ChromeDriver: {str(e)}")
@@ -109,20 +122,17 @@ class MockDriver:
 # Function to get PRIZM code for a single postal code
 def get_prizm_code(postal_code):
     try:
-        # Clean the postal code (remove spaces, convert to uppercase)
-        postal_code = postal_code.strip().upper().replace(" ", "")
+        # Use the validate_postal_code function from scrape_logic.py
+        formatted_postal_code = validate_postal_code(postal_code)
         
-        # Validate postal code format (Canadian postal codes are in the format A1A 1A1)
-        if len(postal_code) < 6:
+        # If the postal code is invalid, return an error
+        if not formatted_postal_code:
             return {
                 "postal_code": postal_code,
                 "prizm_code": None,
                 "status": "error",
-                "message": "Invalid postal code format. Canadian postal codes should be 6 characters."
+                "message": "Invalid postal code format. Canadian postal codes should be in the format A1A 1A1."
             }
-        
-        # Format with a space in the middle (e.g., "V8A 2P4")
-        formatted_postal_code = f"{postal_code[:3]} {postal_code[3:]}"
         
         logger.info(f"Processing postal code: {formatted_postal_code}")
         
@@ -141,75 +151,30 @@ def get_prizm_code(postal_code):
             }
         
         try:
-            # Navigate to the PRIZM website
-            driver.get("https://prizm.environicsanalytics.com/en-ca")
+            # Create debug screenshots directory if it doesn't exist
+            os.makedirs("debug_screenshots", exist_ok=True)
             
-            # Wait for the search input to be available
-            try:
-                search_input = WebDriverWait(driver, 15).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='search']"))
-                )
-                
-                # Enter the postal code
-                search_input.clear()
-                search_input.send_keys(formatted_postal_code)
-                
-                # Wait for the search results to load
-                time.sleep(3)
-                
-                # Try different selectors to find the PRIZM code
-                selectors = [
-                    ".search-results-item .prizm-segment-id",
-                    ".search-result-item .prizm-code",
-                    "[data-prizm-code]",
-                    ".segment-id",
-                    ".prizm-id"
-                ]
-                
-                prizm_code = None
-                for selector in selectors:
-                    try:
-                        # Try to find the element with this selector
-                        element = WebDriverWait(driver, 5).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                        )
-                        prizm_code = element.text.strip()
-                        if prizm_code:
-                            # If we found a code, break out of the loop
-                            logger.info(f"Found PRIZM code {prizm_code} for {formatted_postal_code} using selector {selector}")
-                            break
-                    except (TimeoutException, NoSuchElementException):
-                        # If this selector didn't work, try the next one
-                        continue
-                
-                # If we found a PRIZM code, return it
-                if prizm_code:
-                    return {
-                        "postal_code": formatted_postal_code,
-                        "prizm_code": prizm_code,
-                        "status": "success"
-                    }
-                
-                # If we get here, we couldn't find the PRIZM code with any of our selectors
-                # Take a screenshot for debugging
-                screenshot_path = f"/tmp/{postal_code}_screenshot.png"
-                driver.save_screenshot(screenshot_path)
-                logger.error(f"Could not find PRIZM code for {formatted_postal_code}. Screenshot saved to {screenshot_path}")
-                
+            # Use the get_segment_number function from scrape_logic.py
+            result = get_segment_number(driver, formatted_postal_code)
+            
+            # Map the result to our API response format
+            if result["status"] == "success":
                 return {
                     "postal_code": formatted_postal_code,
-                    "prizm_code": None,
-                    "status": "error",
-                    "message": "Could not find PRIZM code on the page. The website structure may have changed."
+                    "prizm_code": result["segment_number"],
+                    "status": "success"
                 }
+            else:
+                # Extract error message if available
+                error_msg = result["status"]
+                if error_msg.startswith("error: "):
+                    error_msg = error_msg[7:]  # Remove "error: " prefix
                 
-            except TimeoutException:
-                logger.error(f"Timeout waiting for search input for {formatted_postal_code}")
                 return {
                     "postal_code": formatted_postal_code,
                     "prizm_code": None,
                     "status": "error",
-                    "message": "Timeout waiting for the search input to load."
+                    "message": f"Could not find PRIZM code: {error_msg}"
                 }
                 
         except Exception as e:
@@ -272,11 +237,66 @@ def get_batch_prizm():
             "error": f"Too many postal codes. Maximum allowed is {max_postal_codes}."
         }), 400
     
-    # Process postal codes sequentially to avoid browser issues
-    # For a production system, you might want to use a queue system
-    results = []
-    for postal_code in postal_codes:
-        results.append(get_prizm_code(postal_code))
+    # Check if we're using the mock driver
+    driver = get_driver()
+    if isinstance(driver, MockDriver):
+        # Process postal codes sequentially with the mock driver
+        results = []
+        for postal_code in postal_codes:
+            results.append(get_prizm_code(postal_code))
+    else:
+        # Use the process_postal_codes function from scrape_logic.py for batch processing
+        # First, validate all postal codes
+        valid_postal_codes = []
+        invalid_results = []
+        
+        for postal_code in postal_codes:
+            formatted = validate_postal_code(postal_code)
+            if formatted:
+                valid_postal_codes.append(formatted)
+            else:
+                invalid_results.append({
+                    "postal_code": postal_code,
+                    "prizm_code": None,
+                    "status": "error",
+                    "message": "Invalid postal code format. Canadian postal codes should be in the format A1A 1A1."
+                })
+        
+        # Process valid postal codes in batch
+        if valid_postal_codes:
+            # Create debug screenshots directory if it doesn't exist
+            os.makedirs("debug_screenshots", exist_ok=True)
+            
+            # Process the valid postal codes
+            batch_results = process_postal_codes(valid_postal_codes)
+            
+            # Convert the results to our API format
+            valid_results = []
+            for result in batch_results:
+                if result["status"] == "success":
+                    valid_results.append({
+                        "postal_code": result["postal_code"],
+                        "prizm_code": result["segment_number"],
+                        "status": "success"
+                    })
+                else:
+                    # Extract error message if available
+                    error_msg = result["status"]
+                    if error_msg.startswith("error: "):
+                        error_msg = error_msg[7:]  # Remove "error: " prefix
+                    
+                    valid_results.append({
+                        "postal_code": result["postal_code"],
+                        "prizm_code": None,
+                        "status": "error",
+                        "message": f"Could not find PRIZM code: {error_msg}"
+                    })
+            
+            # Combine valid and invalid results
+            results = invalid_results + valid_results
+        else:
+            # All postal codes were invalid
+            results = invalid_results
     
     return jsonify({
         "results": results,
@@ -312,6 +332,9 @@ python app.py
 if __name__ == '__main__':
     # Create templates directory if it doesn't exist
     os.makedirs('templates', exist_ok=True)
+    
+    # Create debug screenshots directory if it doesn't exist
+    os.makedirs('debug_screenshots', exist_ok=True)
     
     # Create run script
     create_run_script()
