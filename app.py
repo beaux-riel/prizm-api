@@ -12,10 +12,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
 from webdriver_manager.chrome import ChromeDriverManager
-from concurrent.futures import ThreadPoolExecutor
 
 # Import scrape_logic functions
-from scrape_logic import validate_postal_code, get_segment_number, process_postal_codes
+from scrape_logic import validate_postal_code, get_segment_number
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
@@ -236,68 +235,13 @@ def get_batch_prizm():
         return jsonify({
             "error": f"Too many postal codes. Maximum allowed is {max_postal_codes}."
         }), 400
-    
-    # Check if we're using the mock driver
+
+    # Process all postal codes sequentially using the single-lookup helper
     driver = get_driver()
-    if isinstance(driver, MockDriver):
-        # Process postal codes sequentially with the mock driver
-        results = []
-        for postal_code in postal_codes:
-            results.append(get_prizm_code(postal_code))
-    else:
-        # Use the process_postal_codes function from scrape_logic.py for batch processing
-        # First, validate all postal codes
-        valid_postal_codes = []
-        invalid_results = []
-        
-        for postal_code in postal_codes:
-            formatted = validate_postal_code(postal_code)
-            if formatted:
-                valid_postal_codes.append(formatted)
-            else:
-                invalid_results.append({
-                    "postal_code": postal_code,
-                    "prizm_code": None,
-                    "status": "error",
-                    "message": "Invalid postal code format. Canadian postal codes should be in the format A1A 1A1."
-                })
-        
-        # Process valid postal codes in batch
-        if valid_postal_codes:
-            # Create debug screenshots directory if it doesn't exist
-            os.makedirs("debug_screenshots", exist_ok=True)
-            
-            # Process the valid postal codes
-            batch_results = process_postal_codes(valid_postal_codes)
-            
-            # Convert the results to our API format
-            valid_results = []
-            for result in batch_results:
-                if result["status"] == "success":
-                    valid_results.append({
-                        "postal_code": result["postal_code"],
-                        "prizm_code": result["segment_number"],
-                        "status": "success"
-                    })
-                else:
-                    # Extract error message if available
-                    error_msg = result["status"]
-                    if error_msg.startswith("error: "):
-                        error_msg = error_msg[7:]  # Remove "error: " prefix
-                    
-                    valid_results.append({
-                        "postal_code": result["postal_code"],
-                        "prizm_code": None,
-                        "status": "error",
-                        "message": f"Could not find PRIZM code: {error_msg}"
-                    })
-            
-            # Combine valid and invalid results
-            results = invalid_results + valid_results
-        else:
-            # All postal codes were invalid
-            results = invalid_results
-    
+    results = []
+    for postal_code in postal_codes:
+        results.append(get_prizm_code(postal_code))
+
     return jsonify({
         "results": results,
         "total": len(results),
