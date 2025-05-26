@@ -1,0 +1,4 @@
+build:
+  html:
+    source: _site
+    destination: /

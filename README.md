@@ -2,6 +2,18 @@
 
 This tool provides an API endpoint for users to submit Canadian postal codes and retrieve the associated PRIZM codes from Environics Analytics.
 
+## Website
+
+A static demonstration of the API is available on GitHub Pages at:
+https://beaux-riel.github.io/prizm-api/
+
+The GitHub Pages site includes:
+- Static demonstration of the API interface
+- API documentation
+- Project information
+
+Note that the actual API functionality requires running the server locally or deploying it to your own server.
+
 ## Features
 
 - Single postal code lookup via GET request
