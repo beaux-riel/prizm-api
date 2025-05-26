@@ -1,162 +1,211 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PRIZM Code Lookup</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+      }
+      .container {
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        padding: 20px;
+        margin-top: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input[type="text"],
+      textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      button {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      .result {
+        margin-top: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #fff;
+        display: none;
+      }
+      .api-info {
+        margin-top: 30px;
+        border-top: 1px solid #ddd;
+        padding-top: 20px;
+      }
+      code {
+        background-color: #f5f5f5;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: monospace;
+      }
+      .loading {
+        display: none;
+        text-align: center;
+        margin-top: 20px;
+      }
+      .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 2s linear infinite;
+        margin: 0 auto;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
         }
-        h1 {
-            color: #333;
-            text-align: center;
+        100% {
+          transform: rotate(360deg);
         }
-        .container {
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            padding: 20px;
-            margin-top: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input[type="text"], textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .result {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #fff;
-            display: none;
-        }
-        .api-info {
-            margin-top: 30px;
-            border-top: 1px solid #ddd;
-            padding-top: 20px;
-        }
-        code {
-            background-color: #f5f5f5;
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: monospace;
-        }
-        .loading {
-            display: none;
-            text-align: center;
-            margin-top: 20px;
-        }
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 2s linear infinite;
-            margin: 0 auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+      }
+      .expandable-row {
+        background-color: #f9f9f9;
+        display: none;
+      }
+      .expand-btn {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 2px 6px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .expand-btn:hover {
+        background: #0056b3;
+      }
+      .segment-description {
+        max-width: 400px;
+        word-wrap: break-word;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>PRIZM Code Lookup</h1>
-    
+
     <div class="container">
-        <h2>Single Postal Code Lookup</h2>
-        <div class="form-group">
-            <label for="postal-code">Enter Canadian Postal Code:</label>
-            <input type="text" id="postal-code" placeholder="e.g., V8A 2P4" required>
-        </div>
-        <button onclick="lookupSingle()">Lookup PRIZM Code</button>
-        
-        <div class="loading" id="single-loading">
-            <div class="spinner"></div>
-            <p>Looking up PRIZM code...</p>
-        </div>
-        
-        <div class="result" id="single-result"></div>
+      <h2>Single Postal Code Lookup</h2>
+      <div class="form-group">
+        <label for="postal-code">Enter Canadian Postal Code:</label>
+        <input
+          type="text"
+          id="postal-code"
+          placeholder="e.g., V8A 2P4"
+          required
+        />
+      </div>
+      <button onclick="lookupSingle()">Lookup PRIZM Code</button>
+
+      <div class="loading" id="single-loading">
+        <div class="spinner"></div>
+        <p>Looking up PRIZM code...</p>
+      </div>
+
+      <div class="result" id="single-result"></div>
     </div>
-    
+
     <div class="container">
-        <h2>Batch Postal Code Lookup</h2>
-        <div class="form-group">
-            <label for="batch-postal-codes">Enter Multiple Canadian Postal Codes (one per line):</label>
-            <textarea id="batch-postal-codes" rows="5" placeholder="e.g., V8A 2P4&#10;M5V 2H1&#10;K1A 0A9" required></textarea>
-        </div>
-        <button onclick="lookupBatch()">Lookup PRIZM Codes</button>
-        
-        <div class="loading" id="batch-loading">
-            <div class="spinner"></div>
-            <p>Processing postal codes...</p>
-        </div>
-        
-        <div class="result" id="batch-result"></div>
+      <h2>Batch Postal Code Lookup</h2>
+      <div class="form-group">
+        <label for="batch-postal-codes"
+          >Enter Multiple Canadian Postal Codes (one per line):</label
+        >
+        <textarea
+          id="batch-postal-codes"
+          rows="5"
+          placeholder="e.g., V8A 2P4&#10;M5V 2H1&#10;K1A 0A9"
+          required
+        ></textarea>
+      </div>
+      <button onclick="lookupBatch()">Lookup PRIZM Codes</button>
+
+      <div class="loading" id="batch-loading">
+        <div class="spinner"></div>
+        <p>Processing postal codes...</p>
+      </div>
+
+      <div class="result" id="batch-result"></div>
     </div>
-    
+
     <div class="api-info">
-        <h2>API Documentation</h2>
-        <h3>Single Postal Code Lookup</h3>
-        <p>Endpoint: <code>GET /api/prizm?postal_code=V8A2P4</code></p>
-        <p>Response:</p>
-        <pre><code>{
+      <h2>API Documentation</h2>
+      <h3>Single Postal Code Lookup</h3>
+      <p>Endpoint: <code>GET /api/prizm?postal_code=V8A2P4</code></p>
+      <p>Response:</p>
+      <pre><code>{
   "postal_code": "V8A 2P4",
   "prizm_code": "62",
+  "household_income": "$87,388",
+  "residency_home_type": "Own & Rent | Single Detached / Low Rise Apt",
+  "segment_description": "Suburban, lower-middle-income singles and couples...",
   "status": "success"
 }</code></pre>
-        
-        <h3>Batch Postal Code Lookup</h3>
-        <p>Endpoint: <code>POST /api/prizm/batch</code></p>
-        <p>Request Body:</p>
-        <pre><code>{
+
+      <h3>Batch Postal Code Lookup</h3>
+      <p>Endpoint: <code>POST /api/prizm/batch</code></p>
+      <p>Request Body:</p>
+      <pre><code>{
   "postal_codes": ["V8A2P4", "M5V2H1", "K1A0A9"]
 }</code></pre>
-        <p>Response:</p>
-        <pre><code>{
+      <p>Response:</p>
+      <pre><code>{
   "results": [
     {
       "postal_code": "V8A 2P4",
       "prizm_code": "62",
+      "household_income": "$87,388",
+      "residency_home_type": "Own & Rent | Single Detached / Low Rise Apt",
+      "segment_description": "Suburban, lower-middle-income singles and couples...",
       "status": "success"
     },
     {
       "postal_code": "M5V 2H1",
       "prizm_code": "01",
+      "household_income": "$125,000",
+      "residency_home_type": "Own & Rent | High Rise Apt",
+      "segment_description": "Young urban professionals...",
       "status": "success"
     },
     {
       "postal_code": "K1A 0A9",
       "prizm_code": "11",
+      "household_income": "$95,000",
+      "residency_home_type": "Own | Single Detached",
+      "segment_description": "Government workers and professionals...",
       "status": "success"
     }
   ],
@@ -164,116 +213,187 @@
   "successful": 3
 }</code></pre>
     </div>
-    
+
     <script>
-        function lookupSingle() {
-            const postalCode = document.getElementById('postal-code').value.trim();
-            if (!postalCode) {
-                alert('Please enter a postal code');
-                return;
-            }
-            
-            const resultDiv = document.getElementById('single-result');
-            const loadingDiv = document.getElementById('single-loading');
-            
-            resultDiv.style.display = 'none';
-            loadingDiv.style.display = 'block';
-            
-            fetch(`/api/prizm?postal_code=${encodeURIComponent(postalCode)}`)
-                .then(response => response.json())
-                .then(data => {
-                    loadingDiv.style.display = 'none';
-                    resultDiv.style.display = 'block';
-                    
-                    if (data.status === 'success') {
-                        resultDiv.innerHTML = `
+      function lookupSingle() {
+        const postalCode = document.getElementById("postal-code").value.trim();
+        if (!postalCode) {
+          alert("Please enter a postal code");
+          return;
+        }
+
+        const resultDiv = document.getElementById("single-result");
+        const loadingDiv = document.getElementById("single-loading");
+
+        resultDiv.style.display = "none";
+        loadingDiv.style.display = "block";
+
+        fetch(`/api/prizm?postal_code=${encodeURIComponent(postalCode)}`)
+          .then((response) => response.json())
+          .then((data) => {
+            loadingDiv.style.display = "none";
+            resultDiv.style.display = "block";
+
+            if (data.status === "success") {
+              let htmlContent = `
                             <h3>Result</h3>
                             <p><strong>Postal Code:</strong> ${data.postal_code}</p>
                             <p><strong>PRIZM Code:</strong> ${data.prizm_code}</p>
                         `;
-                    } else {
-                        resultDiv.innerHTML = `
+
+              // Add household income if available
+              if (data.household_income) {
+                htmlContent += `<p><strong>Household Income:</strong> ${data.household_income}</p>`;
+              }
+
+              // Add residency and home type if available
+              if (data.residency_home_type) {
+                htmlContent += `<p><strong>Residency & Home Type:</strong> ${data.residency_home_type}</p>`;
+              }
+
+              // Add segment description if available
+              if (data.segment_description) {
+                htmlContent += `<p><strong>Segment Description:</strong> ${data.segment_description}</p>`;
+              }
+
+              // Add note if it's mock data
+              if (data.note) {
+                htmlContent += `<p><em>Note: ${data.note}</em></p>`;
+              }
+
+              resultDiv.innerHTML = htmlContent;
+            } else {
+              resultDiv.innerHTML = `
                             <h3>Error</h3>
-                            <p>${data.message || 'Could not find PRIZM code for this postal code'}</p>
+                            <p>${
+                              data.message ||
+                              "Could not find PRIZM code for this postal code"
+                            }</p>
                         `;
-                    }
-                })
-                .catch(error => {
-                    loadingDiv.style.display = 'none';
-                    resultDiv.style.display = 'block';
-                    resultDiv.innerHTML = `
+            }
+          })
+          .catch((error) => {
+            loadingDiv.style.display = "none";
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = `
                         <h3>Error</h3>
                         <p>An error occurred: ${error.message}</p>
                     `;
-                });
+          });
+      }
+
+      function lookupBatch() {
+        const postalCodesText = document
+          .getElementById("batch-postal-codes")
+          .value.trim();
+        if (!postalCodesText) {
+          alert("Please enter at least one postal code");
+          return;
         }
-        
-        function lookupBatch() {
-            const postalCodesText = document.getElementById('batch-postal-codes').value.trim();
-            if (!postalCodesText) {
-                alert('Please enter at least one postal code');
-                return;
-            }
-            
-            const postalCodes = postalCodesText.split('\n')
-                .map(code => code.trim())
-                .filter(code => code.length > 0);
-                
-            if (postalCodes.length === 0) {
-                alert('Please enter at least one valid postal code');
-                return;
-            }
-            
-            const resultDiv = document.getElementById('batch-result');
-            const loadingDiv = document.getElementById('batch-loading');
-            
-            resultDiv.style.display = 'none';
-            loadingDiv.style.display = 'block';
-            
-            fetch('/api/prizm/batch', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ postal_codes: postalCodes })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    loadingDiv.style.display = 'none';
-                    resultDiv.style.display = 'block';
-                    
-                    let html = `
+
+        const postalCodes = postalCodesText
+          .split("\n")
+          .map((code) => code.trim())
+          .filter((code) => code.length > 0);
+
+        if (postalCodes.length === 0) {
+          alert("Please enter at least one valid postal code");
+          return;
+        }
+
+        const resultDiv = document.getElementById("batch-result");
+        const loadingDiv = document.getElementById("batch-loading");
+
+        resultDiv.style.display = "none";
+        loadingDiv.style.display = "block";
+
+        fetch("/api/prizm/batch", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ postal_codes: postalCodes }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            loadingDiv.style.display = "none";
+            resultDiv.style.display = "block";
+
+            let html = `
                         <h3>Results (${data.successful} of ${data.total} successful)</h3>
                         <table style="width:100%; border-collapse: collapse;">
                             <tr>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Postal Code</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">PRIZM Code</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Household Income</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Residency & Home Type</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Status</th>
                             </tr>
                     `;
-                    
-                    data.results.forEach(result => {
-                        html += `
+
+            data.results.forEach((result, index) => {
+              html += `
                             <tr>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${result.postal_code}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${result.prizm_code || '-'}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${result.status}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${
+                                  result.postal_code
+                                }</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${
+                                  result.prizm_code || "-"
+                                }</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${
+                                  result.household_income || "-"
+                                }</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${
+                                  result.residency_home_type || "-"
+                                }</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">
+                                    ${result.status}
+                                    ${
+                                      result.segment_description
+                                        ? `<br><button class="expand-btn" onclick="toggleDescription(${index})">View Description</button>`
+                                        : ""
+                                    }
+                                </td>
                             </tr>
                         `;
-                    });
-                    
-                    html += '</table>';
-                    resultDiv.innerHTML = html;
-                })
-                .catch(error => {
-                    loadingDiv.style.display = 'none';
-                    resultDiv.style.display = 'block';
-                    resultDiv.innerHTML = `
+
+              if (result.segment_description) {
+                html += `
+                                <tr id="desc-${index}" class="expandable-row">
+                                    <td colspan="5" style="border: 1px solid #ddd; padding: 8px; background-color: #f9f9f9;">
+                                        <strong>Segment Description:</strong><br>
+                                        <div class="segment-description">${result.segment_description}</div>
+                                    </td>
+                                </tr>
+                            `;
+              }
+            });
+
+            html += "</table>";
+            resultDiv.innerHTML = html;
+          })
+          .catch((error) => {
+            loadingDiv.style.display = "none";
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = `
                         <h3>Error</h3>
                         <p>An error occurred: ${error.message}</p>
                     `;
-                });
+          });
+      }
+
+      function toggleDescription(index) {
+        const row = document.getElementById(`desc-${index}`);
+        const button = event.target;
+
+        if (row.style.display === "none" || row.style.display === "") {
+          row.style.display = "table-row";
+          button.textContent = "Hide Description";
+        } else {
+          row.style.display = "none";
+          button.textContent = "View Description";
         }
+      }
     </script>
-</body>
+  </body>
 </html>
