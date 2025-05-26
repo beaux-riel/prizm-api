@@ -145,6 +145,9 @@ def get_prizm_code(postal_code):
             return {
                 "postal_code": formatted_postal_code,
                 "prizm_code": "62",  # Mock PRIZM code
+                "household_income": "$85,000",  # Mock household income
+                "residency_home_type": "Residency: Urban | Home Type: Apartment",  # Mock residency and home type
+                "segment_description": "Young urban professionals | Young singles and couples who are well educated and ethnically diverse",  # Mock segment description
                 "status": "success",
                 "note": "This is mock data for testing purposes"
             }
@@ -161,6 +164,9 @@ def get_prizm_code(postal_code):
                 return {
                     "postal_code": formatted_postal_code,
                     "prizm_code": result["segment_number"],
+                    "household_income": result["household_income"],
+                    "residency_home_type": result["residency_home_type"],
+                    "segment_description": result["segment_description"],
                     "status": "success"
                 }
             else:
@@ -172,6 +178,9 @@ def get_prizm_code(postal_code):
                 return {
                     "postal_code": formatted_postal_code,
                     "prizm_code": None,
+                    "household_income": None,
+                    "residency_home_type": None,
+                    "segment_description": None,
                     "status": "error",
                     "message": f"Could not find PRIZM code: {error_msg}"
                 }
@@ -181,6 +190,9 @@ def get_prizm_code(postal_code):
             return {
                 "postal_code": formatted_postal_code,
                 "prizm_code": None,
+                "household_income": None,
+                "residency_home_type": None,
+                "segment_description": None,
                 "status": "error",
                 "message": f"Error during web scraping: {str(e)}"
             }
@@ -190,6 +202,9 @@ def get_prizm_code(postal_code):
         return {
             "postal_code": postal_code,
             "prizm_code": None,
+            "household_income": None,
+            "residency_home_type": None,
+            "segment_description": None,
             "status": "error",
             "message": f"Error processing request: {str(e)}"
         }

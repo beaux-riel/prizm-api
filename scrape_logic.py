@@ -29,7 +29,7 @@ def validate_postal_code(postal_code):
     return f"{postal_code[:3]} {postal_code[3:]}"
 
 def get_segment_number(driver, postal_code):
-    """Search for a postal code and extract the segment number"""
+    """Search for a postal code and extract the segment number and additional fields"""
     try:
         driver.get("https://prizm.environicsanalytics.com/en-ca")
         time.sleep(5)  # let page load
@@ -109,12 +109,71 @@ def get_segment_number(driver, postal_code):
                 if m:
                     segment_number = m.group(1)
                     break
+        
+        # 1. Get the $ value inside <p> tags beneath "Average Household Income"
+        household_income = None
+        try:
+            # Find the Average Household Income header
+            income_header = driver.find_element(By.XPATH, "//div[contains(@class, 'react-tabs__tab-item__title') and contains(text(), 'Average Household Income')]")
+            # Get the <p> tag directly beneath it
+            income_value = income_header.find_element(By.XPATH, "./following-sibling::p")
+            household_income = income_value.text.strip()
+        except (NoSuchElementException, TimeoutException):
+            household_income = "Not available"
+        
+        # 2. Get and concatenate text from <p> tags beneath "Residency" and "Home Type"
+        residency_home_type = ""
+        try:
+            # Find the Residency header and its value
+            residency_header = driver.find_element(By.XPATH, "//div[contains(@class, 'react-tabs__tab-item__title') and contains(text(), 'Residency')]")
+            residency_value = residency_header.find_element(By.XPATH, "./following-sibling::p")
+            residency_text = residency_value.text.strip()
+            
+            # Find the Home Type header and its value
+            home_type_header = driver.find_element(By.XPATH, "//div[contains(@class, 'react-tabs__tab-item__title') and contains(text(), 'Home Type')]")
+            home_type_value = home_type_header.find_element(By.XPATH, "./following-sibling::p")
+            home_type_text = home_type_value.text.strip()
+            
+            # Concatenate the values
+            residency_home_type = f"Residency: {residency_text} | Home Type: {home_type_text}"
+        except (NoSuchElementException, TimeoutException):
+            residency_home_type = "Not available"
+        
+        # 3. Get and concatenate 'segment-details__short-description' and 'segment-details__slide__who__text'
+        segment_description = ""
+        try:
+            # Get the short description
+            short_desc_elem = driver.find_element(By.CLASS_NAME, "segment-details__short-description")
+            short_desc = short_desc_elem.text.strip()
+            
+            # Get the who text
+            who_text_elem = driver.find_element(By.CLASS_NAME, "segment-details__slide__who__text")
+            who_text = who_text_elem.text.strip()
+            
+            # Concatenate the values
+            segment_description = f"{short_desc} | {who_text}"
+        except (NoSuchElementException, TimeoutException):
+            segment_description = "Not available"
 
-        return {"postal_code": postal_code, "segment_number": segment_number or "Unknown", "status": "success"}
+        return {
+            "postal_code": postal_code, 
+            "segment_number": segment_number or "Unknown", 
+            "household_income": household_income,
+            "residency_home_type": residency_home_type,
+            "segment_description": segment_description,
+            "status": "success"
+        }
 
     except Exception as e:
         driver.save_screenshot(f"debug_screenshots/error_{postal_code.replace(' ', '_')}.png")
-        return {"postal_code": postal_code, "segment_number": None, "status": f"error: {e}"}
+        return {
+            "postal_code": postal_code, 
+            "segment_number": None, 
+            "household_income": None,
+            "residency_home_type": None,
+            "segment_description": None,
+            "status": f"error: {e}"
+        }
 
 def process_postal_codes(postal_codes, headless=True):
     """Process a list of postal codes and return their segment numbers"""
