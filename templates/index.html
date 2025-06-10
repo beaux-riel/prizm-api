@@ -169,9 +169,17 @@
       <pre><code>{
   "postal_code": "V8A 2P4",
   "prizm_code": "62",
-  "household_income": "$87,388",
-  "residency_home_type": "Own & Rent | Single Detached / Low Rise Apt",
-  "segment_description": "Suburban, lower-middle-income singles and couples...",
+  "segment_name": "Boomer Bliss",
+  "segment_description": "Older, financially comfortable, suburban couples and families",
+  "average_household_income": "$163,097",
+  "education": "University/College",
+  "urbanity": "Suburban",
+  "average_household_net_worth": "$1,513,488",
+  "occupation": "White Collar/Service Sector",
+  "diversity": "Low",
+  "family_life": "Couples/Families",
+  "tenure": "Own",
+  "home_type": "Single Detached",
   "status": "success"
 }</code></pre>
 
@@ -187,25 +195,46 @@
     {
       "postal_code": "V8A 2P4",
       "prizm_code": "62",
-      "household_income": "$87,388",
-      "residency_home_type": "Own & Rent | Single Detached / Low Rise Apt",
-      "segment_description": "Suburban, lower-middle-income singles and couples...",
+      "segment_name": "Boomer Bliss",
+      "average_household_income": "$163,097",
+      "average_household_net_worth": "$1,513,488",
+      "education": "University/College",
+      "urbanity": "Suburban",
+      "occupation": "White Collar/Service Sector",
+      "diversity": "Low",
+      "family_life": "Couples/Families",
+      "tenure": "Own",
+      "home_type": "Single Detached",
       "status": "success"
     },
     {
       "postal_code": "M5V 2H1",
       "prizm_code": "01",
-      "household_income": "$125,000",
-      "residency_home_type": "Own & Rent | High Rise Apt",
-      "segment_description": "Young urban professionals...",
+      "segment_name": "Urban Elite",
+      "average_household_income": "$125,000",
+      "average_household_net_worth": "$850,000",
+      "education": "University/Graduate",
+      "urbanity": "Urban Core",
+      "occupation": "Executive/Professional",
+      "diversity": "High",
+      "family_life": "Singles/Couples",
+      "tenure": "Own",
+      "home_type": "High Rise Condo",
       "status": "success"
     },
     {
       "postal_code": "K1A 0A9",
       "prizm_code": "11",
-      "household_income": "$95,000",
-      "residency_home_type": "Own | Single Detached",
-      "segment_description": "Government workers and professionals...",
+      "segment_name": "Government Workers",
+      "average_household_income": "$95,000",
+      "average_household_net_worth": "$650,000",
+      "education": "University/College",
+      "urbanity": "Suburban",
+      "occupation": "Government/Public Service",
+      "diversity": "Medium",
+      "family_life": "Families",
+      "tenure": "Own",
+      "home_type": "Single Detached",
       "status": "success"
     }
   ],
@@ -241,19 +270,48 @@
                             <p><strong>PRIZM Code:</strong> ${data.prizm_code}</p>
                         `;
 
-              // Add household income if available
-              if (data.household_income) {
-                htmlContent += `<p><strong>Household Income:</strong> ${data.household_income}</p>`;
-              }
-
-              // Add residency and home type if available
-              if (data.residency_home_type) {
-                htmlContent += `<p><strong>Residency & Home Type:</strong> ${data.residency_home_type}</p>`;
+              // Add segment name if available
+              if (data.segment_name) {
+                htmlContent += `<p><strong>Segment Name:</strong> ${data.segment_name}</p>`;
               }
 
               // Add segment description if available
               if (data.segment_description) {
                 htmlContent += `<p><strong>Segment Description:</strong> ${data.segment_description}</p>`;
+              }
+
+              // Add comprehensive demographic data
+              htmlContent += `<h4>Financial Profile</h4>`;
+              if (data.average_household_income) {
+                htmlContent += `<p><strong>Average Household Income:</strong> ${data.average_household_income}</p>`;
+              }
+              if (data.average_household_net_worth) {
+                htmlContent += `<p><strong>Average Household Net Worth:</strong> ${data.average_household_net_worth}</p>`;
+              }
+
+              htmlContent += `<h4>Demographics & Lifestyle</h4>`;
+              if (data.education) {
+                htmlContent += `<p><strong>Education:</strong> ${data.education}</p>`;
+              }
+              if (data.urbanity) {
+                htmlContent += `<p><strong>Urbanity:</strong> ${data.urbanity}</p>`;
+              }
+              if (data.occupation) {
+                htmlContent += `<p><strong>Occupation:</strong> ${data.occupation}</p>`;
+              }
+              if (data.diversity) {
+                htmlContent += `<p><strong>Diversity:</strong> ${data.diversity}</p>`;
+              }
+              if (data.family_life) {
+                htmlContent += `<p><strong>Family Life:</strong> ${data.family_life}</p>`;
+              }
+
+              htmlContent += `<h4>Housing</h4>`;
+              if (data.tenure) {
+                htmlContent += `<p><strong>Tenure:</strong> ${data.tenure}</p>`;
+              }
+              if (data.home_type) {
+                htmlContent += `<p><strong>Home Type:</strong> ${data.home_type}</p>`;
               }
 
               // Add note if it's mock data
@@ -325,8 +383,9 @@
                             <tr>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Postal Code</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">PRIZM Code</th>
-                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Household Income</th>
-                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Residency & Home Type</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Segment Name</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Income</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Education</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Status</th>
                             </tr>
                     `;
@@ -341,28 +400,112 @@
                                   result.prizm_code || "-"
                                 }</td>
                                 <td style="border: 1px solid #ddd; padding: 8px;">${
-                                  result.household_income || "-"
+                                  result.segment_name || "-"
                                 }</td>
                                 <td style="border: 1px solid #ddd; padding: 8px;">${
-                                  result.residency_home_type || "-"
+                                  result.average_household_income || "-"
+                                }</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${
+                                  result.education || "-"
                                 }</td>
                                 <td style="border: 1px solid #ddd; padding: 8px;">
                                     ${result.status}
                                     ${
-                                      result.segment_description
-                                        ? `<br><button class="expand-btn" onclick="toggleDescription(${index})">View Description</button>`
+                                      result.segment_description ||
+                                      result.average_household_net_worth ||
+                                      result.occupation ||
+                                      result.urbanity ||
+                                      result.diversity ||
+                                      result.family_life ||
+                                      result.tenure ||
+                                      result.home_type
+                                        ? `<br><button class="expand-btn" onclick="toggleDescription(${index})">View Details</button>`
                                         : ""
                                     }
                                 </td>
                             </tr>
                         `;
 
-              if (result.segment_description) {
+              if (
+                result.segment_description ||
+                result.average_household_net_worth ||
+                result.occupation ||
+                result.urbanity ||
+                result.diversity ||
+                result.family_life ||
+                result.tenure ||
+                result.home_type
+              ) {
                 html += `
                                 <tr id="desc-${index}" class="expandable-row">
-                                    <td colspan="5" style="border: 1px solid #ddd; padding: 8px; background-color: #f9f9f9;">
-                                        <strong>Segment Description:</strong><br>
-                                        <div class="segment-description">${result.segment_description}</div>
+                                    <td colspan="6" style="border: 1px solid #ddd; padding: 8px; background-color: #f9f9f9;">
+                                        ${
+                                          result.segment_name
+                                            ? `<h4>${result.segment_name}</h4>`
+                                            : ""
+                                        }
+                                        ${
+                                          result.segment_description
+                                            ? `<p><strong>Description:</strong> ${result.segment_description}</p>`
+                                            : ""
+                                        }
+                                        
+                                        <div style="display: flex; flex-wrap: wrap; gap: 20px; margin: 10px 0;">
+                                            <div style="flex: 1; min-width: 200px;">
+                                                <h5>Financial Profile</h5>
+                                                ${
+                                                  result.average_household_income
+                                                    ? `<p><strong>Household Income:</strong> ${result.average_household_income}</p>`
+                                                    : ""
+                                                }
+                                                ${
+                                                  result.average_household_net_worth
+                                                    ? `<p><strong>Net Worth:</strong> ${result.average_household_net_worth}</p>`
+                                                    : ""
+                                                }
+                                            </div>
+                                            <div style="flex: 1; min-width: 200px;">
+                                                <h5>Demographics</h5>
+                                                ${
+                                                  result.education
+                                                    ? `<p><strong>Education:</strong> ${result.education}</p>`
+                                                    : ""
+                                                }
+                                                ${
+                                                  result.urbanity
+                                                    ? `<p><strong>Urbanity:</strong> ${result.urbanity}</p>`
+                                                    : ""
+                                                }
+                                                ${
+                                                  result.occupation
+                                                    ? `<p><strong>Occupation:</strong> ${result.occupation}</p>`
+                                                    : ""
+                                                }
+                                                ${
+                                                  result.diversity
+                                                    ? `<p><strong>Diversity:</strong> ${result.diversity}</p>`
+                                                    : ""
+                                                }
+                                            </div>
+                                            <div style="flex: 1; min-width: 200px;">
+                                                <h5>Lifestyle & Housing</h5>
+                                                ${
+                                                  result.family_life
+                                                    ? `<p><strong>Family Life:</strong> ${result.family_life}</p>`
+                                                    : ""
+                                                }
+                                                ${
+                                                  result.tenure
+                                                    ? `<p><strong>Tenure:</strong> ${result.tenure}</p>`
+                                                    : ""
+                                                }
+                                                ${
+                                                  result.home_type
+                                                    ? `<p><strong>Home Type:</strong> ${result.home_type}</p>`
+                                                    : ""
+                                                }
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             `;
@@ -388,10 +531,10 @@
 
         if (row.style.display === "none" || row.style.display === "") {
           row.style.display = "table-row";
-          button.textContent = "Hide Description";
+          button.textContent = "Hide Details";
         } else {
           row.style.display = "none";
-          button.textContent = "View Description";
+          button.textContent = "View Details";
         }
       }
     </script>

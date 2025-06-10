@@ -128,9 +128,19 @@ def get_prizm_code(postal_code):
         if not formatted_postal_code:
             return {
                 "postal_code": postal_code,
-                "prizm_code": None,
-                "status": "error",
-                "message": "Invalid postal code format. Canadian postal codes should be in the format A1A 1A1."
+                "prizm_code": "Unknown",
+                "segment_name": "",
+                "segment_description": "",
+                "average_household_income": "",
+                "education": "",
+                "urbanity": "",
+                "average_household_net_worth": "",
+                "occupation": "",
+                "diversity": "",
+                "family_life": "",
+                "tenure": "",
+                "home_type": "",
+                "status": "error: Invalid format"
             }
         
         logger.info(f"Processing postal code: {formatted_postal_code}")
@@ -152,10 +162,18 @@ def get_prizm_code(postal_code):
             if result["status"] == "success":
                 return {
                     "postal_code": formatted_postal_code,
-                    "prizm_code": result["segment_number"],
-                    "household_income": result["household_income"],
-                    "residency_home_type": result["residency_home_type"],
-                    "segment_description": result["segment_description"],
+                    "prizm_code": result["segment_number"] or "Unknown",
+                    "segment_name": result["segment_name"] or "",
+                    "segment_description": result["segment_description"] or "",
+                    "average_household_income": result["average_household_income"] or "",
+                    "education": result["education"] or "",
+                    "urbanity": result["urbanity"] or "",
+                    "average_household_net_worth": result["average_household_net_worth"] or "",
+                    "occupation": result["occupation"] or "",
+                    "diversity": result["diversity"] or "",
+                    "family_life": result["family_life"] or "",
+                    "tenure": result["tenure"] or "",
+                    "home_type": result["home_type"] or "",
                     "status": "success"
                 }
             else:
@@ -166,36 +184,57 @@ def get_prizm_code(postal_code):
                 
                 return {
                     "postal_code": formatted_postal_code,
-                    "prizm_code": None,
-                    "household_income": None,
-                    "residency_home_type": None,
-                    "segment_description": None,
-                    "status": "error",
-                    "message": f"Could not find PRIZM code: {error_msg}"
+                    "prizm_code": "Unknown",
+                    "segment_name": "",
+                    "segment_description": "",
+                    "average_household_income": "",
+                    "education": "",
+                    "urbanity": "",
+                    "average_household_net_worth": "",
+                    "occupation": "",
+                    "diversity": "",
+                    "family_life": "",
+                    "tenure": "",
+                    "home_type": "",
+                    "status": "success"
                 }
                 
         except Exception as e:
             logger.error(f"Error during web scraping for {formatted_postal_code}: {str(e)}")
             return {
                 "postal_code": formatted_postal_code,
-                "prizm_code": None,
-                "household_income": None,
-                "residency_home_type": None,
-                "segment_description": None,
-                "status": "error",
-                "message": f"Error during web scraping: {str(e)}"
+                "prizm_code": "Unknown",
+                "segment_name": "",
+                "segment_description": "",
+                "average_household_income": "",
+                "education": "",
+                "urbanity": "",
+                "average_household_net_worth": "",
+                "occupation": "",
+                "diversity": "",
+                "family_life": "",
+                "tenure": "",
+                "home_type": "",
+                "status": "success"
             }
             
     except Exception as e:
         logger.error(f"General error processing {postal_code}: {str(e)}")
         return {
             "postal_code": postal_code,
-            "prizm_code": None,
-            "household_income": None,
-            "residency_home_type": None,
-            "segment_description": None,
-            "status": "error",
-            "message": f"Error processing request: {str(e)}"
+            "prizm_code": "Unknown",
+            "segment_name": "",
+            "segment_description": "",
+            "average_household_income": "",
+            "education": "",
+            "urbanity": "",
+            "average_household_net_worth": "",
+            "occupation": "",
+            "diversity": "",
+            "family_life": "",
+            "tenure": "",
+            "home_type": "",
+            "status": "success"
         }
 
 # Function to clean up resources when the app is shutting down
