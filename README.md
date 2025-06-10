@@ -8,6 +8,7 @@ A static demonstration of the API is available on GitHub Pages at:
 https://beaux-riel.github.io/prizm-api/
 
 The GitHub Pages site includes:
+
 - Static demonstration of the API interface
 - API documentation
 - Project information
@@ -20,6 +21,14 @@ Note that the actual API functionality requires running the server locally or de
 - Batch postal code lookup via POST request
 - Web interface for easy testing
 - Parallel processing for batch requests
+- Comprehensive demographic data extraction including:
+  - PRIZM segment number and name
+  - Detailed segment description
+  - Average household income and net worth
+  - Education level, occupation, and urbanity
+  - Family life, tenure, and home type information
+  - Diversity metrics
+  - Complete "Who They Are" lifestyle descriptions
 
 ## Requirements
 
@@ -83,10 +92,23 @@ GET /api/prizm?postal_code=V8A2P4
 ```
 
 Response:
+
 ```json
 {
   "postal_code": "V8A 2P4",
   "prizm_code": "62",
+  "segment_name": "Boomer Bliss",
+  "segment_description": "Older, financially comfortable, suburban couples and families",
+  "who_they_are": "Detailed description of the demographic segment lifestyle and characteristics",
+  "average_household_income": "$163,097",
+  "education": "University/College",
+  "urbanity": "Suburban",
+  "average_household_net_worth": "$1,513,488",
+  "occupation": "White Collar/Service Sector",
+  "diversity": "Low",
+  "family_life": "Couples/Families",
+  "tenure": "Own",
+  "home_type": "Single Detached",
   "status": "success"
 }
 ```
@@ -103,22 +125,55 @@ Content-Type: application/json
 ```
 
 Response:
+
 ```json
 {
   "results": [
     {
       "postal_code": "V8A 2P4",
       "prizm_code": "62",
+      "segment_name": "Boomer Bliss",
+      "segment_description": "Older, financially comfortable, suburban couples and families",
+      "who_they_are": "Detailed description of the demographic segment...",
+      "average_household_income": "$163,097",
+      "education": "University/College",
+      "urbanity": "Suburban",
+      "average_household_net_worth": "$1,513,488",
+      "occupation": "White Collar/Service Sector",
+      "diversity": "Low",
+      "family_life": "Couples/Families",
+      "tenure": "Own",
+      "home_type": "Single Detached",
       "status": "success"
     },
     {
       "postal_code": "M5V 2H1",
       "prizm_code": "01",
+      "segment_name": "Urban Elite",
+      "average_household_income": "$125,000",
+      "average_household_net_worth": "$850,000",
+      "education": "University/Graduate",
+      "urbanity": "Urban Core",
+      "occupation": "Executive/Professional",
+      "diversity": "High",
+      "family_life": "Singles/Couples",
+      "tenure": "Own",
+      "home_type": "High Rise Condo",
       "status": "success"
     },
     {
       "postal_code": "K1A 0A9",
       "prizm_code": "11",
+      "segment_name": "Government Workers",
+      "average_household_income": "$95,000",
+      "average_household_net_worth": "$650,000",
+      "education": "University/College",
+      "urbanity": "Suburban",
+      "occupation": "Government/Public Service",
+      "diversity": "Medium",
+      "family_life": "Families",
+      "tenure": "Own",
+      "home_type": "Single Detached",
       "status": "success"
     }
   ],
@@ -136,8 +191,13 @@ A simple web interface is available at the root URL (`/`) for testing the API di
 1. The API receives a postal code request
 2. It uses Selenium to navigate to the PRIZM website
 3. It enters the postal code in the search field
-4. It extracts the PRIZM code from the search results
-5. It returns the result to the user
+4. It extracts comprehensive demographic data from the search results including:
+   - PRIZM segment number and name
+   - Detailed descriptions and lifestyle information
+   - Financial data (income, net worth)
+   - Social and demographic characteristics
+   - Housing and location preferences
+5. It returns the complete demographic profile to the user
 
 ## Mock Mode
 

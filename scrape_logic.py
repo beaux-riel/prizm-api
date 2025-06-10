@@ -28,6 +28,159 @@ def validate_postal_code(postal_code):
             return None
     return f"{postal_code[:3]} {postal_code[3:]}"
 
+def extract_demographic_data(driver, postal_code):
+    """Extract comprehensive demographic data from the PRIZM page"""
+    demographic_data = {
+        "segment_name": None,
+        "segment_description": None,
+        "who_they_are": None,
+        "average_household_income": None,
+        "education": None,
+        "urbanity": None,
+        "average_household_net_worth": None,
+        "occupation": None,
+        "diversity": None,
+        "family_life": None,
+        "tenure": None,
+        "home_type": None
+    }
+    
+    try:
+        # First, find the segment-details container
+        segment_details = None
+        try:
+            segment_details = driver.find_element(By.ID, "segment-details")
+        except (NoSuchElementException, TimeoutException):
+            # Fallback to class-based selector
+            try:
+                segment_details = driver.find_element(By.CSS_SELECTOR, "[id='segment-details'], .segment-details")
+            except (NoSuchElementException, TimeoutException):
+                print("Could not find segment-details container")
+                return demographic_data
+        
+        print(f"Found segment-details container")
+        
+        # Find the active segment slide
+        active_segment = None
+        try:
+            active_segment = segment_details.find_element(By.CSS_SELECTOR, ".segment-details__slide--active")
+            print("Found active segment slide")
+        except (NoSuchElementException, TimeoutException):
+            print("Could not find active segment slide, using first segment slide")
+            try:
+                active_segment = segment_details.find_element(By.CSS_SELECTOR, ".segment-details__slide")
+            except (NoSuchElementException, TimeoutException):
+                print("Could not find any segment slide")
+                return demographic_data
+        
+        # Get segment name from the active segment
+        try:
+            segment_title = active_segment.find_element(By.CSS_SELECTOR, ".segment-details__title h2.title")
+            segment_name = segment_title.text.strip()
+            # Extract just the name part (remove the number prefix if present)
+            # The text contains the number and name, so we need to extract just the name
+            lines = segment_name.split('\n')
+            # Find the line that contains the actual segment name (not just numbers)
+            for line in lines:
+                line = line.strip()
+                if line and not line.isdigit() and not re.match(r'^\d+$', line):
+                    demographic_data["segment_name"] = line
+                    break
+            print(f"Found segment name: {demographic_data['segment_name']}")
+        except (NoSuchElementException, TimeoutException):
+            print("Could not find segment name")
+        
+        # Get segment description (short description) from the active segment
+        short_description = ""
+        try:
+            desc_elem = active_segment.find_element(By.CSS_SELECTOR, ".segment-details__short-description")
+            short_description = desc_elem.text.strip()
+            print(f"Found short description: {short_description[:100]}...")
+        except (NoSuchElementException, TimeoutException):
+            print("Could not find short description")
+        
+        # Get "Who They Are" detailed description from the active segment
+        detailed_description = ""
+        try:
+            who_elem = active_segment.find_element(By.CSS_SELECTOR, ".segment-details__slide__who__text")
+            detailed_description = who_elem.text.strip()
+            print(f"Found detailed description: {detailed_description[:100]}...")
+        except (NoSuchElementException, TimeoutException):
+            print("Could not find detailed description")
+        
+        # Concatenate short and detailed descriptions
+        if short_description and detailed_description:
+            demographic_data["segment_description"] = f"{short_description} | {detailed_description}"
+        elif short_description:
+            demographic_data["segment_description"] = short_description
+        elif detailed_description:
+            demographic_data["segment_description"] = detailed_description
+        
+        # Store the detailed description separately for who_they_are field
+        demographic_data["who_they_are"] = detailed_description
+        
+        print(f"Final concatenated description: {demographic_data['segment_description'][:150]}...")
+        
+        # Extract demographic fields from the active segment using the correct structure
+        demographic_fields = {
+            "average_household_income": ["Average Household Income"],
+            "education": ["Education"],
+            "urbanity": ["Urbanity"],
+            "average_household_net_worth": ["Average Household Net Worth"],
+            "occupation": ["Occupation"],
+            "diversity": ["Diversity"],
+            "family_life": ["Family Life"],
+            "tenure": ["Tenure"],
+            "home_type": ["Home Type"]
+        }
+        
+        # Find the demographic data in the list structure within the active segment
+        search_container = active_segment if active_segment else segment_details
+        
+        for field_key, field_labels in demographic_fields.items():
+            for label in field_labels:
+                try:
+                    # Look for the specific structure: div.react-tabs__tab-item__title containing the label, followed by a p element
+                    title_elem = search_container.find_element(By.XPATH, f".//div[@class='react-tabs__tab-item__title' and text()='{label}']")
+                    # Find the following p element
+                    value_elem = title_elem.find_element(By.XPATH, "./following-sibling::p")
+                    value = value_elem.text.strip()
+                    if value and value not in ["", "N/A", "n/a", "Not Available"]:
+                        demographic_data[field_key] = value
+                        print(f"Found {field_key}: {value}")
+                        break
+                except (NoSuchElementException, TimeoutException):
+                    continue
+                
+                if demographic_data[field_key]:
+                    break
+        
+        # If we didn't find specific fields, try to extract all text content from segment-details
+        # and parse it for common patterns
+        if not any(demographic_data.values()):
+            try:
+                all_text = segment_details.text
+                print(f"Segment details text content: {all_text[:500]}...")
+                
+                # Try to extract income patterns
+                income_patterns = [
+                    r'(?:Average Household Income|Household Income|Income)[:|\s]*\$?([\d,]+)',
+                    r'\$?([\d,]+)(?:\s*(?:average|household|income))',
+                ]
+                for pattern in income_patterns:
+                    match = re.search(pattern, all_text, re.IGNORECASE)
+                    if match and not demographic_data["average_household_income"]:
+                        demographic_data["average_household_income"] = f"${match.group(1)}"
+                        break
+                        
+            except Exception as e:
+                print(f"Error parsing segment details text: {e}")
+        
+    except Exception as e:
+        print(f"Error extracting demographic data: {e}")
+    
+    return demographic_data
+
 def get_segment_number(driver, postal_code):
     """Search for a postal code and extract the segment number and additional fields"""
     try:
@@ -69,162 +222,85 @@ def get_segment_number(driver, postal_code):
 
         # wait for result number element
         WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "segment-details__number"))
+            EC.presence_of_element_located((By.ID, "segment-details"))
         )
         driver.save_screenshot("debug_screenshots/results_page.png")
 
-        # try extracting from a heading first
+        # Find segment details container first
+        segment_details = None
+        try:
+            segment_details = driver.find_element(By.ID, "segment-details")
+        except (NoSuchElementException, TimeoutException):
+            try:
+                segment_details = driver.find_element(By.CSS_SELECTOR, "[id='segment-details'], .segment-details")
+            except (NoSuchElementException, TimeoutException):
+                print("Could not find segment-details container for segment number extraction")
+
+        # Find the active segment slide for extracting the segment number
+        active_segment = None
+        if segment_details:
+            try:
+                active_segment = segment_details.find_element(By.CSS_SELECTOR, ".segment-details__slide--active")
+                print("Found active segment slide for number extraction")
+            except (NoSuchElementException, TimeoutException):
+                print("Could not find active segment slide, using first segment slide")
+                try:
+                    active_segment = segment_details.find_element(By.CSS_SELECTOR, ".segment-details__slide")
+                except (NoSuchElementException, TimeoutException):
+                    print("Could not find any segment slide")
+
+        # Extract segment number from the active segment
         segment_number = None
-        for sel in [
-            ".segment-details__name",
-            ".segment-name",
-            ".segment-title",
-            ".profile-segment h1",
-            ".profile-segment h2",
-            ".segment-details h1",
-            ".segment-details h2",
-        ]:
-            elems = driver.find_elements(By.CSS_SELECTOR, sel)
-            for el in elems:
-                text = el.text.strip()
-                m = re.match(r"^\s*(\d+)\s+.+$", text)
-                if m:
-                    segment_number = m.group(1)
-                    break
-            if segment_number:
-                break
-
-        # fallback: grab the standalone number element
-        if not segment_number:
-            num_el = driver.find_element(By.CLASS_NAME, "segment-details__number")
-            digits = re.sub(r"\D", "", num_el.text or "")
-            if digits:
-                segment_number = digits
-
-        # last resort: search page text
-        if not segment_number:
-            body = driver.find_element(By.TAG_NAME, "body").text
-            for pat in [r"Segment\s+(\d+)", r"PRIZM\s+Segment\s+(\d+)"]:
-                m = re.search(pat, body)
-                if m:
-                    segment_number = m.group(1)
-                    break
+        search_container = active_segment if active_segment else segment_details
         
-        # 1. Get the $ value inside <p> tags beneath "Average Household Income"
-        household_income = None
-        try:
-            # Try different approaches to find the household income
+        if search_container:
             try:
-                # First approach: Find the Average Household Income header and get the next <p> tag
-                income_header = driver.find_element(By.XPATH, "//div[contains(@class, 'react-tabs__tab-item__title') and contains(text(), 'Average Household Income')]")
-                income_value = income_header.find_element(By.XPATH, "./following-sibling::p")
-                household_income = income_value.text.strip()
+                # Look for the segment number in the title structure
+                number_elem = search_container.find_element(By.CSS_SELECTOR, ".segment-details__number span:last-child")
+                segment_number = number_elem.text.strip()
+                print(f"Found segment number: {segment_number}")
             except (NoSuchElementException, TimeoutException):
-                # Second approach: Try a more direct XPath
-                income_value = driver.find_element(By.XPATH, "//div[contains(text(), 'Average Household Income')]/following-sibling::p[1]")
-                household_income = income_value.text.strip()
-                
-            # If the postal code is V8A 2P4, ensure we return the expected value for testing
-            if postal_code == "V8A 2P4" and not household_income:
-                household_income = "$87,388"
-                
-        except (NoSuchElementException, TimeoutException):
-            household_income = "Not available"
-            # For testing purposes, if the postal code is V8A 2P4, return the expected value
-            if postal_code == "V8A 2P4":
-                household_income = "$87,388"
-        
-        # 2. Get and concatenate text from <p> tags beneath "Residency" and "Home Type"
-        residency_home_type = ""
-        try:
-            # Find the Residency value
-            try:
-                residency_header = driver.find_element(By.XPATH, "//div[contains(@class, 'react-tabs__tab-item__title') and contains(text(), 'Residency')]")
-                residency_value = residency_header.find_element(By.XPATH, "./following-sibling::p")
-                residency_text = residency_value.text.strip()
-            except (NoSuchElementException, TimeoutException):
-                # Try alternative XPath
-                residency_value = driver.find_element(By.XPATH, "//div[contains(text(), 'Residency')]/following-sibling::p[1]")
-                residency_text = residency_value.text.strip()
-            
-            # Find the Home Type value
-            try:
-                home_type_header = driver.find_element(By.XPATH, "//div[contains(@class, 'react-tabs__tab-item__title') and contains(text(), 'Home Type')]")
-                home_type_value = home_type_header.find_element(By.XPATH, "./following-sibling::p")
-                home_type_text = home_type_value.text.strip()
-            except (NoSuchElementException, TimeoutException):
-                # Try alternative XPath
-                home_type_value = driver.find_element(By.XPATH, "//div[contains(text(), 'Home Type')]/following-sibling::p[1]")
-                home_type_text = home_type_value.text.strip()
-            
-            # Concatenate the values
-            residency_home_type = f"{residency_text} | {home_type_text}"
-            
-            # If the postal code is V8A 2P4, ensure we return the expected value for testing
-            if postal_code == "V8A 2P4" and (not residency_text or not home_type_text):
-                residency_home_type = "Own & Rent | Single Detached / Low Rise Apt"
-                
-        except (NoSuchElementException, TimeoutException):
-            residency_home_type = "Not available"
-            # For testing purposes, if the postal code is V8A 2P4, return the expected value
-            if postal_code == "V8A 2P4":
-                residency_home_type = "Own & Rent | Single Detached / Low Rise Apt"
-        
-        # 3. Get and concatenate 'segment-details__short-description' and 'segment-details__slide__who__text'
-        segment_description = ""
-        try:
-            # Try different approaches to find the segment description
-            short_desc = ""
-            who_text = ""
-            
-            # Get the short description
-            try:
-                short_desc_elem = driver.find_element(By.CLASS_NAME, "segment-details__short-description")
-                short_desc = short_desc_elem.text.strip()
-            except (NoSuchElementException, TimeoutException):
-                # Try alternative selector
+                # Fallback: try to extract from the h2 title
                 try:
-                    short_desc_elem = driver.find_element(By.CSS_SELECTOR, ".segment-details__short-description, .segment-short-description")
-                    short_desc = short_desc_elem.text.strip()
+                    title_elem = search_container.find_element(By.CSS_SELECTOR, ".segment-details__title h2")
+                    title_text = title_elem.text.strip()
+                    m = re.match(r"^\s*(\d+)\s+.+$", title_text)
+                    if m:
+                        segment_number = m.group(1)
+                        print(f"Extracted segment number from title: {segment_number}")
                 except (NoSuchElementException, TimeoutException):
-                    short_desc = ""
-            
-            # Get the who text
+                    pass
+
+        # Fallback: search entire page if still no number found
+        if not segment_number and segment_details:
             try:
-                who_text_elem = driver.find_element(By.CLASS_NAME, "segment-details__slide__who__text")
-                who_text = who_text_elem.text.strip()
-            except (NoSuchElementException, TimeoutException):
-                # Try alternative selector
-                try:
-                    who_text_elem = driver.find_element(By.CSS_SELECTOR, ".segment-details__slide__who__text, .segment-who-text")
-                    who_text = who_text_elem.text.strip()
-                except (NoSuchElementException, TimeoutException):
-                    who_text = ""
-            
-            # Concatenate the values
-            if short_desc and who_text:
-                segment_description = f"{short_desc} | {who_text}"
-            elif short_desc:
-                segment_description = short_desc
-            elif who_text:
-                segment_description = who_text
-            
-            # If the postal code is V8A 2P4, ensure we return the expected value for testing
-            if postal_code == "V8A 2P4" and not segment_description:
-                segment_description = "Suburban, lower-middle-income singles and couples | Suburban Recliners is one of the older segments, a collection of suburban neighbourhoods surrounding smaller and mid-sized cities, including a number of retirement communities. Households typically contain empty-nesting couples and older singles living alone. While many are retired, those still working have jobs in accommodation and food services. Their low incomes go far in their neighbourhoods where single-detached houses and low-rise apartments are inexpensive. These third-plus-generation Canadians are energetic enough to enjoy active leisure pursuits. They like to attend community theatres, craft shows and music festivals. Occasionally, they'll spring for tickets to a figure skating event or auto race. Typically frugal shoppers, they join rewards programs, use coupons and frequent bulk food and second-hand clothing stores."
-                
-        except (NoSuchElementException, TimeoutException):
-            segment_description = "Not available"
-            # For testing purposes, if the postal code is V8A 2P4, return the expected value
-            if postal_code == "V8A 2P4":
-                segment_description = "Suburban, lower-middle-income singles and couples | Suburban Recliners is one of the older segments, a collection of suburban neighbourhoods surrounding smaller and mid-sized cities, including a number of retirement communities. Households typically contain empty-nesting couples and older singles living alone. While many are retired, those still working have jobs in accommodation and food services. Their low incomes go far in their neighbourhoods where single-detached houses and low-rise apartments are inexpensive. These third-plus-generation Canadians are energetic enough to enjoy active leisure pursuits. They like to attend community theatres, craft shows and music festivals. Occasionally, they'll spring for tickets to a figure skating event or auto race. Typically frugal shoppers, they join rewards programs, use coupons and frequent bulk food and second-hand clothing stores."
+                body_text = segment_details.text
+                for pat in [r"Segment\s+(\d+)", r"PRIZM\s+Segment\s+(\d+)", r"(\d+)\s+[A-Z][a-z]+"]:
+                    m = re.search(pat, body_text)
+                    if m:
+                        segment_number = m.group(1)
+                        break
+            except Exception:
+                pass
+        
+        # Extract comprehensive demographic data
+        demographic_data = extract_demographic_data(driver, postal_code)
 
         return {
             "postal_code": postal_code, 
-            "segment_number": segment_number or "Unknown", 
-            "household_income": household_income,
-            "residency_home_type": residency_home_type,
-            "segment_description": segment_description,
+            "segment_number": segment_number or "Unknown",
+            "segment_name": demographic_data["segment_name"],
+            "segment_description": demographic_data["segment_description"],
+            "who_they_are": demographic_data["who_they_are"],
+            "average_household_income": demographic_data["average_household_income"],
+            "education": demographic_data["education"],
+            "urbanity": demographic_data["urbanity"],
+            "average_household_net_worth": demographic_data["average_household_net_worth"],
+            "occupation": demographic_data["occupation"],
+            "diversity": demographic_data["diversity"],
+            "family_life": demographic_data["family_life"],
+            "tenure": demographic_data["tenure"],
+            "home_type": demographic_data["home_type"],
             "status": "success"
         }
 
@@ -232,10 +308,19 @@ def get_segment_number(driver, postal_code):
         driver.save_screenshot(f"debug_screenshots/error_{postal_code.replace(' ', '_')}.png")
         return {
             "postal_code": postal_code, 
-            "segment_number": None, 
-            "household_income": None,
-            "residency_home_type": None,
+            "segment_number": None,
+            "segment_name": None,
             "segment_description": None,
+            "who_they_are": None,
+            "average_household_income": None,
+            "education": None,
+            "urbanity": None,
+            "average_household_net_worth": None,
+            "occupation": None,
+            "diversity": None,
+            "family_life": None,
+            "tenure": None,
+            "home_type": None,
             "status": f"error: {e}"
         }
 
@@ -321,8 +406,14 @@ def main():
             print(f"{r['postal_code']}: {r['status']}")
 
     if args.output:
+        fieldnames = [
+            "postal_code", "segment_number", "segment_name", "segment_description", 
+            "who_they_are", "average_household_income", "education", "urbanity",
+            "average_household_net_worth", "occupation", "diversity", "family_life",
+            "tenure", "home_type", "status"
+        ]
         with open(args.output, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["postal_code", "segment_number", "status"])
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(results)
         print(f"Results saved to {args.output}")
