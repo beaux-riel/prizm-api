@@ -138,31 +138,8 @@ def get_prizm_code(postal_code):
         # Get or initialize the Chrome driver
         driver = get_driver()
         
-        # Check if we're using the mock driver
-        if isinstance(driver, MockDriver):
-            logger.info(f"Using mock driver for {formatted_postal_code}")
-            # Return mock data for testing
-            # If the postal code is V8A 2P4, return the expected test values
-            if formatted_postal_code == "V8A 2P4":
-                return {
-                    "postal_code": formatted_postal_code,
-                    "prizm_code": "62",  # Mock PRIZM code for V8A 2P4
-                    "household_income": "$87,388",  # Expected household income for V8A 2P4
-                    "residency_home_type": "Own & Rent | Single Detached / Low Rise Apt",  # Expected residency and home type for V8A 2P4
-                    "segment_description": "Suburban, lower-middle-income singles and couples | Suburban Recliners is one of the older segments, a collection of suburban neighbourhoods surrounding smaller and mid-sized cities, including a number of retirement communities. Households typically contain empty-nesting couples and older singles living alone. While many are retired, those still working have jobs in accommodation and food services. Their low incomes go far in their neighbourhoods where single-detached houses and low-rise apartments are inexpensive. These third-plus-generation Canadians are energetic enough to enjoy active leisure pursuits. They like to attend community theatres, craft shows and music festivals. Occasionally, they'll spring for tickets to a figure skating event or auto race. Typically frugal shoppers, they join rewards programs, use coupons and frequent bulk food and second-hand clothing stores.",  # Expected segment description for V8A 2P4
-                    "status": "success",
-                    "note": "This is mock data for testing purposes"
-                }
-            else:
-                return {
-                    "postal_code": formatted_postal_code,
-                    "prizm_code": "62",  # Mock PRIZM code
-                    "household_income": "$85,000",  # Mock household income
-                    "residency_home_type": "Own & Rent | Single Detached / Low Rise Apt",  # Mock residency and home type
-                    "segment_description": "Young urban professionals | Young singles and couples who are well educated and ethnically diverse",  # Mock segment description
-                    "status": "success",
-                    "note": "This is mock data for testing purposes"
-                }
+        # We're now always using real data, so no mock driver check needed
+        # The following code has been removed as we want to fetch real-time data
         
         try:
             # Create debug screenshots directory if it doesn't exist
