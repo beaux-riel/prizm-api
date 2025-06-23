@@ -220,6 +220,36 @@ def get_segment_number(driver, postal_code):
         time.sleep(2)
         driver.save_screenshot("debug_screenshots/after_search_initiated.png")
 
+        # Check for error message indicating invalid postal code
+        try:
+            error_element = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "p.hero__intro__error.hero__intro__error--active"))
+            )
+            error_text = error_element.text.strip()
+            print(f"Found error message: {error_text}")
+            
+            # Return error result for invalid postal code
+            return {
+                "postal_code": postal_code, 
+                "segment_number": None,
+                "segment_name": None,
+                "segment_description": None,
+                "who_they_are": None,
+                "average_household_income": None,
+                "education": None,
+                "urbanity": None,
+                "average_household_net_worth": None,
+                "occupation": None,
+                "diversity": None,
+                "family_life": None,
+                "tenure": None,
+                "home_type": None,
+                "status": "error: Invalid postal code - not assigned to a segment"
+            }
+        except TimeoutException:
+            # No error message found, continue with normal processing
+            print("No error message found, proceeding with data extraction")
+
         # wait for result number element
         WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.ID, "segment-details"))

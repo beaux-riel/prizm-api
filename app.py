@@ -177,11 +177,7 @@ def get_prizm_code(postal_code):
                     "status": "success"
                 }
             else:
-                # Extract error message if available
-                error_msg = result["status"]
-                if error_msg.startswith("error: "):
-                    error_msg = error_msg[7:]  # Remove "error: " prefix
-                
+                # Return error status for invalid postal codes
                 return {
                     "postal_code": formatted_postal_code,
                     "prizm_code": "Unknown",
@@ -196,7 +192,7 @@ def get_prizm_code(postal_code):
                     "family_life": "",
                     "tenure": "",
                     "home_type": "",
-                    "status": "success"
+                    "status": result["status"]  # Keep the original error status
                 }
                 
         except Exception as e:
@@ -215,7 +211,7 @@ def get_prizm_code(postal_code):
                 "family_life": "",
                 "tenure": "",
                 "home_type": "",
-                "status": "success"
+                "status": f"error: {str(e)}"
             }
             
     except Exception as e:
@@ -234,7 +230,7 @@ def get_prizm_code(postal_code):
             "family_life": "",
             "tenure": "",
             "home_type": "",
-            "status": "success"
+            "status": f"error: {str(e)}"
         }
 
 # Function to clean up resources when the app is shutting down
@@ -273,7 +269,7 @@ def get_batch_prizm():
         return jsonify({"error": "Postal codes must be a non-empty list"}), 400
     
     # Limit the number of postal codes to process (to prevent abuse)
-    max_postal_codes = 50
+    max_postal_codes = 10
     if len(postal_codes) > max_postal_codes:
         return jsonify({
             "error": f"Too many postal codes. Maximum allowed is {max_postal_codes}."
@@ -288,7 +284,8 @@ def get_batch_prizm():
     return jsonify({
         "results": results,
         "total": len(results),
-        "successful": sum(1 for r in results if r["status"] == "success")
+        "successful": sum(1 for r in results if r["status"] == "success"),
+        "failed": sum(1 for r in results if r["status"] != "success")
     })
 
 # Health check endpoint

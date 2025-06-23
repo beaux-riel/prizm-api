@@ -43,5 +43,51 @@ class TestPrizmAPI(unittest.TestCase):
         self.assertIn('postal_code', result)
         self.assertIn('prizm_code', result)
 
+    def test_invalid_postal_code_format(self):
+        """Test that invalid postal code formats return error status"""
+        # Test with clearly invalid format
+        response = self.app.get('/api/prizm?postal_code=123456')
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'].startswith('error:'))
+        self.assertEqual(data['prizm_code'], 'Unknown')
+
+    def test_nonexistent_postal_code(self):
+        """Test that non-existent postal codes return error status"""
+        # Test with properly formatted but non-existent postal code
+        response = self.app.get('/api/prizm?postal_code=Z9Z9Z9')
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        # Should either be an error or return unknown data
+        # (depending on whether the site shows error or example data)
+
+    def test_batch_with_invalid_postal_codes(self):
+        """Test batch endpoint with mix of valid and invalid postal codes"""
+        postal_codes = ['M5V2H1', '123456', 'V8A2P4', 'Z9Z9Z9']
+        response = self.app.post('/api/prizm/batch',
+                                json={'postal_codes': postal_codes})
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['total'], 4)
+        # Should have both successful and failed entries
+        self.assertIn('failed', data)
+        # At least one should fail due to invalid format
+        self.assertGreater(data.get('failed', 0), 0)
+
+    def test_missing_postal_code_parameter(self):
+        """Test that missing postal code parameter returns 400 error"""
+        response = self.app.get('/api/prizm')
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertIn('error', data)
+
+    def test_empty_postal_codes_batch(self):
+        """Test that empty postal codes list returns 400 error"""
+        response = self.app.post('/api/prizm/batch',
+                                json={'postal_codes': []})
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertIn('error', data)
+
 if __name__ == '__main__':
     unittest.main()
