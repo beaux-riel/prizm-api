@@ -4,6 +4,7 @@ import csv
 import time
 import re
 import os
+import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -14,6 +15,10 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     ElementClickInterceptedException,
 )
+from cache_manager import cache_manager
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Global variable for delay between requests
 request_delay = 2
@@ -183,6 +188,15 @@ def extract_demographic_data(driver, postal_code):
 
 def get_segment_number(driver, postal_code):
     """Search for a postal code and extract the segment number and additional fields"""
+    
+    # First, check if we have cached data for this postal code
+    cached_data = cache_manager.get_cached_data(postal_code)
+    if cached_data:
+        logger.info(f"Returning cached data for postal code: {postal_code}")
+        return cached_data
+    
+    logger.info(f"No cached data found for {postal_code}, fetching from PRIZM website")
+    
     try:
         driver.get("https://prizm.environicsanalytics.com/en-ca")
         time.sleep(5)  # let page load
@@ -229,7 +243,7 @@ def get_segment_number(driver, postal_code):
             print(f"Found error message: {error_text}")
             
             # Return error result for invalid postal code
-            return {
+            error_result = {
                 "postal_code": postal_code, 
                 "segment_number": None,
                 "segment_name": None,
@@ -246,6 +260,15 @@ def get_segment_number(driver, postal_code):
                 "home_type": None,
                 "status": "error: Invalid postal code - not assigned to a segment"
             }
+            
+            # Cache the invalid postal code result to avoid future API calls
+            # Use full cache duration since invalid postal codes won't become valid
+            if cache_manager.cache_data(postal_code, error_result):
+                logger.info(f"Successfully cached invalid postal code result for: {postal_code}")
+            else:
+                logger.warning(f"Failed to cache invalid postal code result for: {postal_code}")
+            
+            return error_result
         except TimeoutException:
             # No error message found, continue with normal processing
             print("No error message found, proceeding with data extraction")
@@ -316,7 +339,7 @@ def get_segment_number(driver, postal_code):
         # Extract comprehensive demographic data
         demographic_data = extract_demographic_data(driver, postal_code)
 
-        return {
+        result = {
             "postal_code": postal_code, 
             "segment_number": segment_number or "Unknown",
             "segment_name": demographic_data["segment_name"],
@@ -333,10 +356,18 @@ def get_segment_number(driver, postal_code):
             "home_type": demographic_data["home_type"],
             "status": "success"
         }
+        
+        # Cache the successful result
+        if cache_manager.cache_data(postal_code, result):
+            logger.info(f"Successfully cached data for postal code: {postal_code}")
+        else:
+            logger.warning(f"Failed to cache data for postal code: {postal_code}")
+        
+        return result
 
     except Exception as e:
         driver.save_screenshot(f"debug_screenshots/error_{postal_code.replace(' ', '_')}.png")
-        return {
+        error_result = {
             "postal_code": postal_code, 
             "segment_number": None,
             "segment_name": None,
@@ -353,12 +384,27 @@ def get_segment_number(driver, postal_code):
             "home_type": None,
             "status": f"error: {e}"
         }
+        
+        # Cache the error result to avoid future API calls for the same issue
+        # Use shorter cache duration (7 days) for general errors as they might be temporary (network issues, etc.)
+        if cache_manager.cache_data(postal_code, error_result, custom_duration_days=7):
+            logger.info(f"Successfully cached error result for: {postal_code} (7-day duration)")
+        else:
+            logger.warning(f"Failed to cache error result for: {postal_code}")
+        
+        return error_result
 
 def process_postal_codes(postal_codes, headless=True):
     """Process a list of postal codes and return their segment numbers"""
     results = []
     debug_folder = "debug_screenshots"
     os.makedirs(debug_folder, exist_ok=True)
+    
+    # Clean up expired cache entries at the start
+    logger.info("Cleaning up expired cache entries...")
+    expired_count = cache_manager.cleanup_expired_cache()
+    if expired_count > 0:
+        logger.info(f"Removed {expired_count} expired cache entries")
 
     options = webdriver.ChromeOptions()
     if headless:
@@ -376,6 +422,9 @@ def process_postal_codes(postal_codes, headless=True):
     )
 
     driver = None
+    cache_hits = 0
+    api_calls = 0
+    
     try:
         print("Creating Chrome WebDriver...")
         driver = webdriver.Chrome(options=options)
@@ -390,11 +439,23 @@ def process_postal_codes(postal_codes, headless=True):
                 continue
 
             print(f"\nProcessing postal code: {formatted}")
-            res = get_segment_number(driver, formatted)
-            results.append(res)
+            
+            # Check if we have cached data first
+            cached_result = cache_manager.get_cached_data(formatted)
+            if cached_result:
+                print(f"Using cached data for {formatted}")
+                results.append(cached_result)
+                cache_hits += 1
+            else:
+                print(f"Fetching new data for {formatted}")
+                res = get_segment_number(driver, formatted)
+                results.append(res)
+                api_calls += 1
+                
+                print(f"Waiting {request_delay}s before next request...")
+                time.sleep(request_delay)
 
-            print(f"Waiting {request_delay}s before next request...")
-            time.sleep(request_delay)
+        print(f"\nProcessing complete: {cache_hits} cache hits, {api_calls} API calls")
 
     except Exception as e:
         print(f"Failed to create WebDriver: {e}")

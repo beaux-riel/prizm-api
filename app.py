@@ -15,6 +15,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 # Import scrape_logic functions
 from scrape_logic import validate_postal_code, get_segment_number
+# Note: cache_manager is imported locally in functions to handle import errors gracefully
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
@@ -126,7 +127,23 @@ def get_prizm_code(postal_code):
         
         # If the postal code is invalid, return an error
         if not formatted_postal_code:
-            return {
+            # Import cache_manager locally to handle import errors gracefully
+            try:
+                from cache_manager import cache_manager
+                
+                # First check if we have this invalid postal code cached
+                cached_data = cache_manager.get_cached_data(postal_code)
+                if cached_data:
+                    logger.info(f"Returning cached invalid format result for: {postal_code}")
+                    # Add cache metadata if not present
+                    if '_cache_info' not in cached_data:
+                        cached_data['_cache_info'] = {'from_cache': True}
+                    return cached_data
+            except ImportError:
+                logger.warning("Cache manager not available, proceeding without caching")
+            
+            # Create error result for invalid format
+            error_result = {
                 "postal_code": postal_code,
                 "prizm_code": "Unknown",
                 "segment_name": "",
@@ -142,6 +159,18 @@ def get_prizm_code(postal_code):
                 "home_type": "",
                 "status": "error: Invalid format"
             }
+            
+            # Cache the invalid format result (use full duration since format won't change)
+            try:
+                from cache_manager import cache_manager
+                if cache_manager.cache_data(postal_code, error_result):
+                    logger.info(f"Successfully cached invalid format result for: {postal_code}")
+                else:
+                    logger.warning(f"Failed to cache invalid format result for: {postal_code}")
+            except ImportError:
+                logger.warning("Cache manager not available, proceeding without caching")
+            
+            return error_result
         
         logger.info(f"Processing postal code: {formatted_postal_code}")
         
@@ -160,7 +189,7 @@ def get_prizm_code(postal_code):
             
             # Map the result to our API response format
             if result["status"] == "success":
-                return {
+                api_response = {
                     "postal_code": formatted_postal_code,
                     "prizm_code": result["segment_number"] or "Unknown",
                     "segment_name": result["segment_name"] or "",
@@ -176,6 +205,12 @@ def get_prizm_code(postal_code):
                     "home_type": result["home_type"] or "",
                     "status": "success"
                 }
+                
+                # Add cache metadata if present
+                if '_cache_info' in result:
+                    api_response['cache_info'] = result['_cache_info']
+                
+                return api_response
             else:
                 # Return error status for invalid postal codes
                 return {
@@ -287,6 +322,121 @@ def get_batch_prizm():
         "successful": sum(1 for r in results if r["status"] == "success"),
         "failed": sum(1 for r in results if r["status"] != "success")
     })
+
+# Cache management endpoints
+@app.route('/api/cache/stats', methods=['GET'])
+def get_cache_stats():
+    """Get cache statistics"""
+    try:
+        # Import cache_manager here to ensure it's available
+        from cache_manager import cache_manager
+        
+        stats = cache_manager.get_cache_stats()
+        return jsonify({
+            "status": "success",
+            "cache_stats": stats
+        })
+    except ImportError as e:
+        logger.error(f"Cache manager import error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Cache system not available",
+            "details": str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Failed to get cache statistics",
+            "details": str(e)
+        }), 500
+
+@app.route('/api/cache/cleanup', methods=['POST'])
+def cleanup_cache():
+    """Clean up expired cache entries"""
+    try:
+        from cache_manager import cache_manager
+        
+        deleted_count = cache_manager.cleanup_expired_cache()
+        return jsonify({
+            "status": "success",
+            "message": f"Cleaned up {deleted_count} expired cache entries"
+        })
+    except ImportError as e:
+        logger.error(f"Cache manager import error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Cache system not available",
+            "details": str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Error cleaning up cache: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Failed to clean up cache",
+            "details": str(e)
+        }), 500
+
+@app.route('/api/cache/clear', methods=['POST'])
+def clear_cache():
+    """Clear all cache entries (use with caution)"""
+    try:
+        from cache_manager import cache_manager
+        
+        if cache_manager.clear_cache():
+            return jsonify({
+                "status": "success",
+                "message": "All cache entries cleared"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "error": "Failed to clear cache"
+            }), 500
+    except ImportError as e:
+        logger.error(f"Cache manager import error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Cache system not available",
+            "details": str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Error clearing cache: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Failed to clear cache",
+            "details": str(e)
+        }), 500
+
+@app.route('/api/cache/check/<postal_code>', methods=['GET'])
+def check_cache(postal_code):
+    """Check if a postal code is cached"""
+    try:
+        from cache_manager import cache_manager
+        
+        is_cached = cache_manager.is_cached(postal_code)
+        cached_data = cache_manager.get_cached_data(postal_code) if is_cached else None
+        
+        return jsonify({
+            "status": "success",
+            "postal_code": postal_code,
+            "is_cached": is_cached,
+            "cached_at": cached_data.get('_cache_info', {}).get('cached_at') if cached_data else None
+        })
+    except ImportError as e:
+        logger.error(f"Cache manager import error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Cache system not available",
+            "details": str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Error checking cache for {postal_code}: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Failed to check cache",
+            "details": str(e)
+        }), 500
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])

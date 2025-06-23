@@ -243,6 +243,28 @@
 }</code></pre>
     </div>
 
+    <div class="api-info">
+      <h2>Cache Management</h2>
+      <p>
+        The API caches data for up to 3 months to reduce load on the PRIZM
+        website (limited to 10 API calls per day).
+      </p>
+
+      <div id="cache-stats">
+        <p>Loading cache statistics...</p>
+      </div>
+
+      <button onclick="loadCacheStats()" style="margin-right: 10px">
+        Refresh Stats
+      </button>
+      <button onclick="cleanupCache()" style="margin-right: 10px">
+        Cleanup Expired
+      </button>
+      <button onclick="clearCache()" style="background-color: #f44336">
+        Clear All Cache
+      </button>
+    </div>
+
     <script>
       function lookupSingle() {
         const postalCode = document.getElementById("postal-code").value.trim();
@@ -319,6 +341,16 @@
                 htmlContent += `<p><em>Note: ${data.note}</em></p>`;
               }
 
+              // Add cache information if available
+              if (data.cache_info) {
+                htmlContent += `<h4>Data Source</h4>`;
+                htmlContent += `<p><strong>Source:</strong> Cache (saved data)</p>`;
+                htmlContent += `<p><strong>Cached At:</strong> ${data.cache_info.cached_at}</p>`;
+              } else if (data.status === "success") {
+                htmlContent += `<h4>Data Source</h4>`;
+                htmlContent += `<p><strong>Source:</strong> Live data from PRIZM website</p>`;
+              }
+
               resultDiv.innerHTML = htmlContent;
             } else {
               resultDiv.innerHTML = `
@@ -386,11 +418,16 @@
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Segment Name</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Income</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Education</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Source</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Status</th>
                             </tr>
                     `;
 
             data.results.forEach((result, index) => {
+              const sourceInfo = result.cache_info
+                ? `<span style="color: #007cba;">📋 Cache</span><br><small>${result.cache_info.cached_at}</small>`
+                : `<span style="color: #4caf50;">🌐 Live</span>`;
+
               html += `
                             <tr>
                                 <td style="border: 1px solid #ddd; padding: 8px;">${
@@ -408,6 +445,7 @@
                                 <td style="border: 1px solid #ddd; padding: 8px;">${
                                   result.education || "-"
                                 }</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${sourceInfo}</td>
                                 <td style="border: 1px solid #ddd; padding: 8px;">
                                     ${result.status}
                                     ${
@@ -537,6 +575,138 @@
           button.textContent = "View Details";
         }
       }
+
+      // Cache management functions
+      function loadCacheStats() {
+        fetch("/api/cache/stats")
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+              );
+            }
+            return response.json();
+          })
+          .then((data) => {
+            if (data.status === "success") {
+              const stats = data.cache_stats;
+              document.getElementById("cache-stats").innerHTML = `
+                <h4>Cache Statistics</h4>
+                <p><strong>Valid entries:</strong> ${
+                  stats.valid_entries || 0
+                }</p>
+                <p><strong>Expired entries:</strong> ${
+                  stats.expired_entries || 0
+                }</p>
+                <p><strong>Total entries:</strong> ${
+                  stats.total_entries || 0
+                }</p>
+                <p><strong>Database size:</strong> ${formatBytes(
+                  stats.database_size_bytes || 0
+                )}</p>
+                <p><strong>Cache duration:</strong> ${
+                  stats.cache_duration_days || 0
+                } days</p>
+                <p><strong>Oldest entry:</strong> ${
+                  stats.oldest_entry || "N/A"
+                }</p>
+                <p><strong>Newest entry:</strong> ${
+                  stats.newest_entry || "N/A"
+                }</p>
+              `;
+            } else {
+              document.getElementById("cache-stats").innerHTML = `
+                <h4>Cache Statistics</h4>
+                <p style="color: red;">Error: ${
+                  data.error || "Unknown error"
+                }</p>
+                ${
+                  data.details
+                    ? `<p><small>Details: ${data.details}</small></p>`
+                    : ""
+                }
+              `;
+            }
+          })
+          .catch((error) => {
+            console.error("Cache stats error:", error);
+            document.getElementById("cache-stats").innerHTML = `
+              <h4>Cache Statistics</h4>
+              <p style="color: red;">Error loading cache stats: ${error.message}</p>
+              <p><small>This might indicate the cache system is not properly initialized. Check the server logs.</small></p>
+            `;
+          });
+      }
+
+      function cleanupCache() {
+        if (confirm("Clean up expired cache entries?")) {
+          fetch("/api/cache/cleanup", { method: "POST" })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(
+                  `HTTP ${response.status}: ${response.statusText}`
+                );
+              }
+              return response.json();
+            })
+            .then((data) => {
+              if (data.status === "success") {
+                alert(data.message || "Cache cleanup completed");
+                loadCacheStats();
+              } else {
+                alert(`Error: ${data.error || "Unknown error"}`);
+              }
+            })
+            .catch((error) => {
+              alert("Error cleaning up cache: " + error.message);
+            });
+        }
+      }
+
+      function clearCache() {
+        if (
+          confirm(
+            "WARNING: This will clear ALL cached data! This action cannot be undone. Continue?"
+          )
+        ) {
+          fetch("/api/cache/clear", { method: "POST" })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(
+                  `HTTP ${response.status}: ${response.statusText}`
+                );
+              }
+              return response.json();
+            })
+            .then((data) => {
+              if (data.status === "success") {
+                alert(data.message || "Cache cleared");
+                loadCacheStats();
+              } else {
+                alert(`Error: ${data.error || "Unknown error"}`);
+              }
+            })
+            .catch((error) => {
+              alert("Error clearing cache: " + error.message);
+            });
+        }
+      }
+
+      function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return "0 Bytes";
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ["Bytes", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return (
+          parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i]
+        );
+      }
+
+      // Load cache stats when page loads
+      document.addEventListener("DOMContentLoaded", function () {
+        loadCacheStats();
+      });
     </script>
   </body>
 </html>

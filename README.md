@@ -17,10 +17,12 @@ Note that the actual API functionality requires running the server locally or de
 
 ## Features
 
+- **Intelligent Caching System**: Data is cached locally for up to 3 months to reduce API calls to the PRIZM website (limited to 10 calls per day)
 - Single postal code lookup via GET request
 - Batch postal code lookup via POST request
-- Web interface for easy testing
+- Web interface for easy testing with cache status indicators
 - Parallel processing for batch requests
+- Cache management endpoints for monitoring and maintenance
 - Comprehensive demographic data extraction including:
   - PRIZM segment number and name
   - Detailed segment description
@@ -29,6 +31,57 @@ Note that the actual API functionality requires running the server locally or de
   - Family life, tenure, and home type information
   - Diversity metrics
   - Complete "Who They Are" lifestyle descriptions
+
+## Cache System
+
+The API includes an intelligent caching system that:
+
+- **Reduces API calls**: Previously fetched data is stored locally for 3 months
+- **Improves performance**: Cached responses are returned instantly
+- **Automatic cleanup**: Expired cache entries are automatically removed
+- **Cache indicators**: Web interface shows whether data came from cache or live API
+- **Management tools**: Built-in cache statistics and management endpoints
+- **Invalid postal code caching**: Invalid and malformed postal codes are cached to prevent repeated API calls
+- **Smart cache durations**: Different error types use appropriate cache durations (successful results: 90 days, invalid postal codes: 90 days, general errors: 7 days)
+
+### Cache Management
+
+- **View cache stats**: `GET /api/cache/stats`
+- **Cleanup expired entries**: `POST /api/cache/cleanup`
+- **Clear all cache**: `POST /api/cache/clear`
+- **Check if postal code is cached**: `GET /api/cache/check/<postal_code>`
+
+### Command Line Cache Management
+
+Use the included CLI tool for cache management:
+
+```bash
+# View cache statistics
+python cache_cli.py stats
+
+# Clean up expired entries
+python cache_cli.py cleanup
+
+# Clear all cache (use with caution)
+python cache_cli.py clear --confirm
+
+# Check if a postal code is cached
+python cache_cli.py check "V8A 2P4"
+
+# Get cached data for a postal code
+python cache_cli.py get "V8A 2P4"
+```
+
+### Testing Cache Functionality
+
+A test script is included to verify that invalid postal codes are properly cached:
+
+```bash
+# Test invalid postal code caching (requires requests package)
+python test_invalid_caching.py
+```
+
+This script tests various invalid postal codes to ensure they are cached properly and subsequent requests return instantly from cache.
 
 ## Requirements
 
