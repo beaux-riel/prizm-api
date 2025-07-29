@@ -32,6 +32,10 @@ def main():
     get_parser = subparsers.add_parser('get', help='Get cached data for a postal code')
     get_parser.add_argument('postal_code', help='Postal code to retrieve')
     
+    # Delete command
+    delete_parser = subparsers.add_parser('delete', help='Delete cached data for a postal code')
+    delete_parser.add_argument('postal_code', help='Postal code to delete from cache')
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -87,6 +91,14 @@ def main():
                 print(json.dumps(cached_data, indent=2))
             else:
                 print(f"No cached data found for {postal_code}")
+                return 1
+                
+        elif args.command == 'delete':
+            postal_code = args.postal_code.strip().upper()
+            if cache_manager.delete_cached_data(postal_code):
+                print(f"Successfully deleted cache entry for {postal_code}")
+            else:
+                print(f"No cache entry found for {postal_code}")
                 return 1
                 
     except Exception as e:

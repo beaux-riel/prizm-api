@@ -438,6 +438,37 @@ def check_cache(postal_code):
             "details": str(e)
         }), 500
 
+@app.route('/api/cache/delete/<postal_code>', methods=['DELETE'])
+def delete_cache_entry(postal_code):
+    """Delete a specific postal code from cache"""
+    try:
+        from cache_manager import cache_manager
+        
+        if cache_manager.delete_cached_data(postal_code):
+            return jsonify({
+                "status": "success",
+                "message": f"Successfully deleted cache entry for {postal_code}"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "error": f"No cache entry found for {postal_code}"
+            }), 404
+    except ImportError as e:
+        logger.error(f"Cache manager import error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Cache system not available",
+            "details": str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Error deleting cache entry for {postal_code}: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Failed to delete cache entry",
+            "details": str(e)
+        }), 500
+
 # Health check endpoint
 @app.route('/health', methods=['GET'])
 def health_check():

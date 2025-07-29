@@ -259,6 +259,42 @@ class CacheManager:
             True if the postal code is cached and valid, False otherwise
         """
         return self.get_cached_data(postal_code) is not None
+    
+    def delete_cached_data(self, postal_code: str) -> bool:
+        """
+        Delete cached data for a specific postal code
+        
+        Args:
+            postal_code: The postal code to delete from cache
+            
+        Returns:
+            True if deletion was successful, False otherwise
+        """
+        try:
+            postal_code = postal_code.strip().upper()
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Delete the entry for this postal code
+                cursor.execute("""
+                    DELETE FROM postal_code_cache 
+                    WHERE postal_code = ?
+                """, (postal_code,))
+                
+                deleted_count = cursor.rowcount
+                conn.commit()
+                
+                if deleted_count > 0:
+                    logger.info(f"Deleted cache entry for postal code {postal_code}")
+                    return True
+                else:
+                    logger.info(f"No cache entry found for postal code {postal_code}")
+                    return False
+                    
+        except sqlite3.Error as e:
+            logger.error(f"Error deleting cached data for {postal_code}: {e}")
+            return False
 
 
 # Global cache manager instance

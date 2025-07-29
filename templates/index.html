@@ -112,6 +112,30 @@
         max-width: 400px;
         word-wrap: break-word;
       }
+      .delete-btn {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-left: 10px;
+      }
+      .delete-btn:hover {
+        background-color: #d32f2f;
+      }
+      .checkbox-column {
+        width: 40px;
+        text-align: center;
+      }
+      .bulk-actions {
+        margin: 10px 0;
+        display: none;
+      }
+      .select-all-checkbox {
+        margin-right: 5px;
+      }
     </style>
   </head>
   <body>
@@ -351,6 +375,11 @@
                 htmlContent += `<p><strong>Source:</strong> Live data from PRIZM website</p>`;
               }
 
+              // Add delete button if cached
+              if (data.cache_info) {
+                htmlContent += `<button class="delete-btn" onclick="deleteCacheEntry('${postalCode}')">Delete from Cache</button>`;
+              }
+
               resultDiv.innerHTML = htmlContent;
             } else {
               resultDiv.innerHTML = `
@@ -411,8 +440,16 @@
 
             let html = `
                         <h3>Results (${data.successful} of ${data.total} successful)</h3>
+                        <div class="bulk-actions" id="bulk-actions">
+                            <label>
+                                <input type="checkbox" class="select-all-checkbox" id="select-all" onchange="toggleSelectAll()">
+                                Select All Cached
+                            </label>
+                            <button class="delete-btn" onclick="deleteSelectedEntries()">Delete Selected from Cache</button>
+                        </div>
                         <table style="width:100%; border-collapse: collapse;">
                             <tr>
+                                <th class="checkbox-column" style="border: 1px solid #ddd; padding: 8px;"></th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Postal Code</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">PRIZM Code</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Segment Name</th>
@@ -420,6 +457,7 @@
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Education</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Source</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Status</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Actions</th>
                             </tr>
                     `;
 
@@ -428,8 +466,17 @@
                 ? `<span style="color: #007cba;">📋 Cache</span><br><small>${result.cache_info.cached_at}</small>`
                 : `<span style="color: #4caf50;">🌐 Live</span>`;
 
+              const checkboxCell = result.cache_info 
+                ? `<input type="checkbox" class="cache-checkbox" data-postal-code="${result.postal_code}" onchange="updateBulkActions()">`
+                : '';
+              
+              const deleteCell = result.cache_info
+                ? `<button class="delete-btn" onclick="deleteCacheEntry('${result.postal_code}')">Delete</button>`
+                : '-';
+
               html += `
                             <tr>
+                                <td class="checkbox-column" style="border: 1px solid #ddd; padding: 8px; text-align: center;">${checkboxCell}</td>
                                 <td style="border: 1px solid #ddd; padding: 8px;">${
                                   result.postal_code
                                 }</td>
@@ -461,6 +508,7 @@
                                         : ""
                                     }
                                 </td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${deleteCell}</td>
                             </tr>
                         `;
 
@@ -476,7 +524,7 @@
               ) {
                 html += `
                                 <tr id="desc-${index}" class="expandable-row">
-                                    <td colspan="6" style="border: 1px solid #ddd; padding: 8px; background-color: #f9f9f9;">
+                                    <td colspan="9" style="border: 1px solid #ddd; padding: 8px; background-color: #f9f9f9;">
                                         ${
                                           result.segment_name
                                             ? `<h4>${result.segment_name}</h4>`
@@ -552,6 +600,9 @@
 
             html += "</table>";
             resultDiv.innerHTML = html;
+            
+            // Show bulk actions if there are cached entries
+            updateBulkActions();
           })
           .catch((error) => {
             loadingDiv.style.display = "none";
@@ -701,6 +752,90 @@
         return (
           parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i]
         );
+      }
+
+      // Delete cache entry function
+      function deleteCacheEntry(postalCode) {
+        if (confirm(`Delete cache entry for ${postalCode}?`)) {
+          fetch(`/api/cache/delete/${encodeURIComponent(postalCode)}`, { method: "DELETE" })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              }
+              return response.json();
+            })
+            .then((data) => {
+              if (data.status === "success") {
+                alert(data.message || "Cache entry deleted");
+                loadCacheStats();
+                // Refresh current results if in batch mode
+                const batchResult = document.getElementById("batch-result");
+                if (batchResult.style.display === "block") {
+                  lookupBatch();
+                }
+                // Clear single result if it was the deleted entry
+                const singleResult = document.getElementById("single-result");
+                if (singleResult.style.display === "block") {
+                  const currentPostal = document.getElementById("postal-code").value.trim();
+                  if (currentPostal.toUpperCase().replace(/\s/g, '') === postalCode.toUpperCase().replace(/\s/g, '')) {
+                    lookupSingle();
+                  }
+                }
+              } else {
+                alert(`Error: ${data.error || "Unknown error"}`);
+              }
+            })
+            .catch((error) => {
+              alert("Error deleting cache entry: " + error.message);
+            });
+        }
+      }
+
+      // Toggle select all checkboxes
+      function toggleSelectAll() {
+        const selectAll = document.getElementById("select-all");
+        const checkboxes = document.querySelectorAll(".cache-checkbox");
+        checkboxes.forEach(checkbox => {
+          checkbox.checked = selectAll.checked;
+        });
+      }
+
+      // Update bulk actions visibility
+      function updateBulkActions() {
+        const checkboxes = document.querySelectorAll(".cache-checkbox");
+        const bulkActions = document.getElementById("bulk-actions");
+        if (bulkActions && checkboxes.length > 0) {
+          bulkActions.style.display = "block";
+        } else if (bulkActions) {
+          bulkActions.style.display = "none";
+        }
+      }
+
+      // Delete selected entries
+      function deleteSelectedEntries() {
+        const selectedBoxes = document.querySelectorAll(".cache-checkbox:checked");
+        if (selectedBoxes.length === 0) {
+          alert("No entries selected");
+          return;
+        }
+
+        const postalCodes = Array.from(selectedBoxes).map(cb => cb.dataset.postalCode);
+        if (confirm(`Delete ${postalCodes.length} cache entries?`)) {
+          // Delete entries one by one
+          Promise.all(
+            postalCodes.map(postalCode => 
+              fetch(`/api/cache/delete/${encodeURIComponent(postalCode)}`, { method: "DELETE" })
+                .then(response => response.json())
+            )
+          ).then(results => {
+            const successful = results.filter(r => r.status === "success").length;
+            alert(`Deleted ${successful} of ${postalCodes.length} entries`);
+            loadCacheStats();
+            lookupBatch(); // Refresh the batch results
+          }).catch(error => {
+            alert("Error deleting entries: " + error.message);
+          });
+        }
       }
 
       // Load cache stats when page loads
