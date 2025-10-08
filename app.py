@@ -129,16 +129,33 @@ def get_prizm_code(postal_code):
         if not formatted_postal_code:
             # Import cache_manager locally to handle import errors gracefully
             try:
-                from cache_manager import cache_manager
+                from cache_manager_new import cache_manager
                 
                 # First check if we have this invalid postal code cached
                 cached_data = cache_manager.get_cached_data(postal_code)
                 if cached_data:
                     logger.info(f"Returning cached invalid format result for: {postal_code}")
-                    # Add cache metadata if not present
-                    if '_cache_info' not in cached_data:
-                        cached_data['_cache_info'] = {'from_cache': True}
-                    return cached_data
+                    # Transform to API response format
+                    api_response = {
+                        "postal_code": postal_code,
+                        "prizm_code": cached_data.get("segment_number", "Unknown") or "Unknown",
+                        "segment_name": cached_data.get("segment_name", "") or "",
+                        "segment_description": cached_data.get("segment_description", "") or "",
+                        "average_household_income": cached_data.get("average_household_income", "") or "",
+                        "education": cached_data.get("education", "") or "",
+                        "urbanity": cached_data.get("urbanity", "") or "",
+                        "average_household_net_worth": cached_data.get("average_household_net_worth", "") or "",
+                        "occupation": cached_data.get("occupation", "") or "",
+                        "diversity": cached_data.get("diversity", "") or "",
+                        "family_life": cached_data.get("family_life", "") or "",
+                        "tenure": cached_data.get("tenure", "") or "",
+                        "home_type": cached_data.get("home_type", "") or "",
+                        "status": cached_data.get("status", "error: Invalid format")
+                    }
+                    # Add cache metadata if present
+                    if '_cache_info' in cached_data:
+                        api_response['_cache_info'] = cached_data['_cache_info']
+                    return api_response
             except ImportError:
                 logger.warning("Cache manager not available, proceeding without caching")
             
@@ -162,7 +179,7 @@ def get_prizm_code(postal_code):
             
             # Cache the invalid format result (use full duration since format won't change)
             try:
-                from cache_manager import cache_manager
+                from cache_manager_new import cache_manager
                 if cache_manager.cache_data(postal_code, error_result):
                     logger.info(f"Successfully cached invalid format result for: {postal_code}")
                 else:
@@ -209,6 +226,13 @@ def get_prizm_code(postal_code):
                 # Add cache metadata if present
                 if '_cache_info' in result:
                     api_response['cache_info'] = result['_cache_info']
+                    # Add HTML availability flag from cache info
+                    if 'has_html' in result['_cache_info']:
+                        api_response['has_html_capture'] = result['_cache_info']['has_html']
+                
+                # For new scrapes (not from cache), HTML should be available
+                if '_cache_info' not in result:
+                    api_response['has_html_capture'] = True
                 
                 return api_response
             else:
@@ -329,7 +353,7 @@ def get_cache_stats():
     """Get cache statistics"""
     try:
         # Import cache_manager here to ensure it's available
-        from cache_manager import cache_manager
+        from cache_manager_new import cache_manager
         
         stats = cache_manager.get_cache_stats()
         return jsonify({
@@ -355,7 +379,7 @@ def get_cache_stats():
 def cleanup_cache():
     """Clean up expired cache entries"""
     try:
-        from cache_manager import cache_manager
+        from cache_manager_new import cache_manager
         
         deleted_count = cache_manager.cleanup_expired_cache()
         return jsonify({
@@ -381,7 +405,7 @@ def cleanup_cache():
 def clear_cache():
     """Clear all cache entries (use with caution)"""
     try:
-        from cache_manager import cache_manager
+        from cache_manager_new import cache_manager
         
         if cache_manager.clear_cache():
             return jsonify({
@@ -412,7 +436,7 @@ def clear_cache():
 def check_cache(postal_code):
     """Check if a postal code is cached"""
     try:
-        from cache_manager import cache_manager
+        from cache_manager_new import cache_manager
         
         is_cached = cache_manager.is_cached(postal_code)
         cached_data = cache_manager.get_cached_data(postal_code) if is_cached else None
@@ -442,7 +466,7 @@ def check_cache(postal_code):
 def delete_cache_entry(postal_code):
     """Delete a specific postal code from cache"""
     try:
-        from cache_manager import cache_manager
+        from cache_manager_new import cache_manager
         
         if cache_manager.delete_cached_data(postal_code):
             return jsonify({
@@ -466,6 +490,140 @@ def delete_cache_entry(postal_code):
         return jsonify({
             "status": "error",
             "error": "Failed to delete cache entry",
+            "details": str(e)
+        }), 500
+
+# Confirmation endpoints
+@app.route('/api/cache/confirm/<postal_code>', methods=['POST'])
+def confirm_cache_entry(postal_code):
+    """Mark a postal code's data as confirmed/verified"""
+    try:
+        from cache_manager_new import cache_manager
+        
+        if cache_manager.confirm_data(postal_code):
+            return jsonify({
+                "status": "success",
+                "message": f"Successfully confirmed data for {postal_code}"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "error": f"No valid cache entry found for {postal_code}"
+            }), 404
+    except ImportError as e:
+        logger.error(f"Cache manager import error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Cache system not available",
+            "details": str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Error confirming data for {postal_code}: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Failed to confirm data",
+            "details": str(e)
+        }), 500
+
+@app.route('/api/cache/unconfirm/<postal_code>', methods=['POST'])
+def unconfirm_cache_entry(postal_code):
+    """Mark a postal code's data as unconfirmed"""
+    try:
+        from cache_manager_new import cache_manager
+        
+        if cache_manager.unconfirm_data(postal_code):
+            return jsonify({
+                "status": "success",
+                "message": f"Successfully unconfirmed data for {postal_code}"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "error": f"No valid cache entry found for {postal_code}"
+            }), 404
+    except ImportError as e:
+        logger.error(f"Cache manager import error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Cache system not available",
+            "details": str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Error unconfirming data for {postal_code}: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Failed to unconfirm data",
+            "details": str(e)
+        }), 500
+
+@app.route('/api/cache/unconfirmed', methods=['GET'])
+def get_unconfirmed_entries():
+    """Get list of unconfirmed cache entries"""
+    try:
+        from cache_manager_new import cache_manager
+        
+        limit = request.args.get('limit', 100, type=int)
+        entries = cache_manager.get_unconfirmed_entries(limit)
+        
+        return jsonify({
+            "status": "success",
+            "unconfirmed_entries": entries,
+            "count": len(entries)
+        })
+    except ImportError as e:
+        logger.error(f"Cache manager import error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Cache system not available",
+            "details": str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Error getting unconfirmed entries: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Failed to get unconfirmed entries",
+            "details": str(e)
+        }), 500
+
+# Debug endpoint for retrieving HTML content
+@app.route('/api/debug/html/<postal_code>', methods=['GET'])
+def get_debug_html(postal_code):
+    """Get cached HTML content for a postal code (for debugging purposes)"""
+    try:
+        from cache_manager_new import cache_manager
+        
+        # Validate postal code format
+        if not postal_code or len(postal_code) < 6:
+            return jsonify({
+                "status": "error",
+                "error": "Invalid postal code format"
+            }), 400
+        
+        # Get HTML content from cache
+        html_content = cache_manager.get_cached_html(postal_code)
+        
+        if html_content:
+            # Return HTML as text/html for easy viewing in browser
+            return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+        else:
+            return jsonify({
+                "status": "error",
+                "error": f"No HTML content found for postal code {postal_code}",
+                "note": "HTML is only available for postal codes that have been recently scraped with the new HTML capture feature"
+            }), 404
+            
+    except ImportError as e:
+        logger.error(f"Cache manager import error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Cache system not available",
+            "details": str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Error retrieving HTML for {postal_code}: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "Failed to retrieve HTML content",
             "details": str(e)
         }), 500
 

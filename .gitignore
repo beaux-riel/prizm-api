@@ -45,3 +45,5 @@ chromedriver
 chromedriver.exe
 
 .history/
+
+node_modules/

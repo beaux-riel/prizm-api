@@ -268,3 +268,96 @@ When in mock mode, the API will return a response with a "note" field indicating
 - Batch requests are processed sequentially to avoid browser issues
 - Error handling is implemented for invalid postal codes or scraping issues
 - The application can be containerized using Docker for easy deployment
+
+---
+
+## CSV Data Export Tool
+
+In addition to the API, this project includes a TypeScript-based data extraction tool that exports PRIZM demographic data from the cached SQLite database to CSV format.
+
+### Features
+
+- ✅ **Robust Error Handling**: Handles invalid JSON and missing fields gracefully
+- ✅ **TypeScript Support**: Full type safety with comprehensive interfaces
+- ✅ **Comprehensive Tests**: Jest test suite with complete coverage
+- ✅ **UTF-8 Encoding**: Proper handling of special characters
+- ✅ **Detailed Logging**: Progress tracking and error reporting
+- ✅ **Defensive Programming**: Continues processing even if individual records fail
+
+### CSV Export Usage
+
+#### Prerequisites for CSV Export
+
+- **Node.js**: Version 16 or higher
+- **npm**: Version 7 or higher
+- **SQLite database**: `prizm_cache_v2.db` file in the root directory
+
+#### Installation
+
+1. **Install dependencies:**
+
+   ```bash
+   npm install
+   ```
+
+2. **Build the TypeScript code:**
+   ```bash
+   npm run build
+   ```
+
+#### Extract Data to CSV
+
+Run the extraction script:
+
+```bash
+npm run start
+```
+
+This will:
+
+1. Connect to `prizm_cache_v2.db` (read-only)
+2. Extract all demographic records from the `postal_code_cache` table
+3. Parse JSON data and extract the required fields
+4. Export data to `postal_code_demographics.csv`
+5. Display progress information and sample records
+
+#### Run Tests
+
+Execute the comprehensive test suite:
+
+```bash
+npm test
+```
+
+#### CSV Output Format
+
+The generated CSV file (`postal_code_demographics.csv`) contains the following columns:
+
+| Column                        | Description                  | Example                                       |
+| ----------------------------- | ---------------------------- | --------------------------------------------- |
+| `postal_code`                 | Canadian postal code         | `V8A 2P4`                                     |
+| `segment_number`              | PRIZM segment identifier     | `62`                                          |
+| `segment_description`         | Detailed segment description | `Older, lower-middle-income suburban singles` |
+| `average_household_income`    | Formatted income string      | `$95,199`                                     |
+| `average_household_net_worth` | Formatted net worth string   | `$461,727`                                    |
+| `home_type`                   | Housing type description     | `Single Detached / Low Rise Apt`              |
+
+#### TypeScript Project Structure
+
+```
+src/
+├── types.ts           # TypeScript interfaces
+├── database.ts        # Database service class
+├── csvExporter.ts     # CSV export functionality
+├── index.ts          # Main application entry point
+└── index.test.ts     # Comprehensive test suite
+```
+
+#### Data Quality Handling
+
+The CSV extractor handles various error conditions:
+
+- **Invalid JSON**: Records with malformed JSON data are logged as warnings and populated with default values
+- **Missing Fields**: Records lacking required fields use empty string defaults
+- **Database Connection Issues**: Clear error messages with exit codes
+- **File System Problems**: Proper error reporting for CSV write failures

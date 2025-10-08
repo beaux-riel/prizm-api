@@ -119,7 +119,7 @@ CREATE TABLE postal_code_cache (
 The cache system is configurable:
 
 - **Cache duration**: Default 90 days (modifiable in `cache_manager.py`)
-- **Database location**: Default `prizm_cache.db` (customizable)
+- **Database location**: Default `prizm_cache_v2.db` (customizable)
 - **Automatic cleanup**: Runs on app startup
 
 ## Testing the System

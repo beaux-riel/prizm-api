@@ -61,12 +61,14 @@ python cache_cli.py delete "V8A 2P4"
 ### Core Components
 
 1. **app.py**: Main Flask application
+
    - API endpoints: `/api/prizm` (single), `/api/prizm/batch` (multiple)
    - Cache management endpoints: `/api/cache/*`
    - Serves web interface at root `/`
    - Manages Selenium WebDriver lifecycle
 
 2. **scrape_logic.py**: Web scraping engine
+
    - Validates Canadian postal codes
    - Interacts with PRIZM website using Selenium
    - Extracts demographic data from search results
@@ -107,6 +109,7 @@ python cache_cli.py delete "V8A 2P4"
 ## Testing Strategy
 
 The project includes comprehensive test coverage:
+
 - Basic API functionality tests
 - Comprehensive data extraction validation
 - Error handling scenarios
@@ -117,6 +120,7 @@ When adding new features, ensure tests cover both success and failure cases.
 ## Docker Deployment
 
 The application is containerized with:
+
 - Python 3.9-slim base image
 - Chromium browser for headless scraping
 - Environment variables configured for Chrome paths
@@ -126,6 +130,6 @@ The application is containerized with:
 
 1. **API Rate Limit**: The PRIZM website allows only 10 lookups per day per IP
 2. **Postal Code Format**: Canadian postal codes must be 6 characters (e.g., "V8A2P4")
-3. **Cache Database**: `prizm_cache.db` stores all cached results
+3. **Cache Database**: `prizm_cache_v2.db` stores all cached results
 4. **No Linting**: Project doesn't have linting configuration - use standard Python conventions
 5. **Dependencies**: Selenium requires Chrome/Chromium browser to be installed
