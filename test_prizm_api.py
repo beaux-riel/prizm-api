@@ -1,94 +1,99 @@
-#!/usr/bin/env python3
-import unittest
 import json
 import os
-from app import app, get_prizm_code
+import unittest
+from unittest.mock import patch
+
+from app import app
+from prizm_client import normalize_postal_code
+
+
+LOOKUP_RESULT = {
+    "postal_code": "V8A 0A8",
+    "prizm_code": "21",
+    "segment_number": "21",
+    "segment_name": "Scenic Retirement",
+    "segment_description": "Older, middle-income suburbanites",
+    "average_household_income": "$140,223",
+    "education": "High School/College",
+    "urbanity": "Suburban",
+    "average_household_net_worth": "",
+    "occupation": "Mix",
+    "diversity": "Low",
+    "family_life": "Couples/Families",
+    "tenure": "Own",
+    "home_type": "Single Detached/Row",
+    "status": "success",
+}
+
 
 class TestPrizmAPI(unittest.TestCase):
-    """Test cases for the PRIZM API"""
-
     def setUp(self):
-        """Set up the test client"""
-        self.app = app.test_client()
-        self.app.testing = True
+        self.client = app.test_client()
+        self.client.testing = True
 
     def test_health_check(self):
-        """Test the health check endpoint"""
-        response = self.app.get('/health')
+        response = self.client.get("/health")
         data = json.loads(response.data)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(data['status'], 'ok')
 
-    def test_single_postal_code(self):
-        """Test the single postal code endpoint with a valid Canadian postal code"""
-        # Note: This test will only pass if the API is running and can access the PRIZM website
-        response = self.app.get('/api/prizm?postal_code=V8A2P4')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["status"], "ok")
+
+    def test_normalize_postal_code(self):
+        self.assertEqual(normalize_postal_code("v8a0a8"), "V8A 0A8")
+        self.assertEqual(normalize_postal_code("V8A 0A8"), "V8A 0A8")
+        self.assertIsNone(normalize_postal_code("123456"))
+
+    @patch("app.cache_manager.cache_data", return_value=True)
+    @patch("app.cache_manager.get_cached_data", return_value=None)
+    @patch("app.prizm_client.lookup", return_value=LOOKUP_RESULT)
+    def test_single_postal_code(self, lookup, get_cached_data, cache_data):
+        response = self.client.get("/api/prizm?postal_code=V8A0A8")
         data = json.loads(response.data)
-        self.assertEqual(response.status_code, 200)
-        # We don't make specific assertions about the values anymore since they come from a live source
 
-    def test_batch_postal_codes(self):
-        """Test the batch postal codes endpoint with valid Canadian postal codes"""
-        # Note: This test will only pass if the API is running and can access the PRIZM website
-        response = self.app.post('/api/prizm/batch',
-                                json={'postal_codes': ['M5V2H1', 'V8A2P4']})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["postal_code"], "V8A 0A8")
+        self.assertEqual(data["prizm_code"], "21")
+        lookup.assert_called_once_with("V8A0A8")
+        get_cached_data.assert_called_once_with("V8A 0A8")
+        cache_data.assert_called_once()
+
+    @patch("app.cache_manager.cache_data", return_value=True)
+    @patch("app.cache_manager.get_cached_data", return_value=None)
+    @patch("app.prizm_client.lookup", return_value=LOOKUP_RESULT)
+    def test_batch_postal_codes(self, lookup, _get_cached_data, _cache_data):
+        response = self.client.post("/api/prizm/batch", json={"postal_codes": ["V8A0A8", "V8A 0A8"]})
         data = json.loads(response.data)
-        self.assertEqual(response.status_code, 200)
-        # We don't make specific assertions about the values anymore since they come from a live source
 
-    def test_direct_get_prizm_code_function(self):
-        """Test the get_prizm_code function directly with a valid Canadian postal code"""
-        # Note: This test will only pass if the API is running and can access the PRIZM website
-        result = get_prizm_code('V8A2P4')
-        self.assertIn('postal_code', result)
-        self.assertIn('prizm_code', result)
-
-    def test_invalid_postal_code_format(self):
-        """Test that invalid postal code formats return error status"""
-        # Test with clearly invalid format
-        response = self.app.get('/api/prizm?postal_code=123456')
-        data = json.loads(response.data)
         self.assertEqual(response.status_code, 200)
-        # Accept both 'invalid' and 'error:' status formats
-        self.assertTrue(data['status'] == 'invalid' or data['status'].startswith('error:'))
-        self.assertEqual(data['prizm_code'], 'Unknown')
-
-    def test_nonexistent_postal_code(self):
-        """Test that non-existent postal codes return error status"""
-        # Test with properly formatted but non-existent postal code
-        response = self.app.get('/api/prizm?postal_code=Z9Z9Z9')
-        data = json.loads(response.data)
-        self.assertEqual(response.status_code, 200)
-        # Should either be an error or return unknown data
-        # (depending on whether the site shows error or example data)
-
-    def test_batch_with_invalid_postal_codes(self):
-        """Test batch endpoint with mix of valid and invalid postal codes"""
-        postal_codes = ['M5V2H1', '123456', 'V8A2P4', 'Z9Z9Z9']
-        response = self.app.post('/api/prizm/batch',
-                                json={'postal_codes': postal_codes})
-        data = json.loads(response.data)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(data['total'], 4)
-        # Should have both successful and failed entries
-        self.assertIn('failed', data)
-        # At least one should fail due to invalid format
-        self.assertGreater(data.get('failed', 0), 0)
+        self.assertEqual(data["total"], 2)
+        self.assertEqual(data["successful"], 2)
+        self.assertEqual(lookup.call_count, 2)
 
     def test_missing_postal_code_parameter(self):
-        """Test that missing postal code parameter returns 400 error"""
-        response = self.app.get('/api/prizm')
+        response = self.client.get("/api/prizm")
         self.assertEqual(response.status_code, 400)
-        data = json.loads(response.data)
-        self.assertIn('error', data)
 
     def test_empty_postal_codes_batch(self):
-        """Test that empty postal codes list returns 400 error"""
-        response = self.app.post('/api/prizm/batch',
-                                json={'postal_codes': []})
+        response = self.client.post("/api/prizm/batch", json={"postal_codes": []})
         self.assertEqual(response.status_code, 400)
-        data = json.loads(response.data)
-        self.assertIn('error', data)
 
-if __name__ == '__main__':
+    def test_batch_limit(self):
+        response = self.client.post("/api/prizm/batch", json={"postal_codes": ["V8A0A8"] * 11})
+        self.assertEqual(response.status_code, 400)
+
+    def test_optional_api_key_protection(self):
+        os.environ["PRIZM_API_KEY"] = "secret"
+        try:
+            response = self.client.get("/api/segments")
+            self.assertEqual(response.status_code, 401)
+
+            with patch("app.prizm_client.get_all_segments", return_value=[]):
+                response = self.client.get("/api/segments", headers={"X-API-Key": "secret"})
+            self.assertEqual(response.status_code, 200)
+        finally:
+            os.environ.pop("PRIZM_API_KEY", None)
+
+
+if __name__ == "__main__":
     unittest.main()

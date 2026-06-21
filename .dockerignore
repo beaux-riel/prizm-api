@@ -1,0 +1,9 @@
+.git
+.history
+__pycache__
+*.pyc
+*.db
+*.csv
+debug_screenshots
+node_modules
+.DS_Store

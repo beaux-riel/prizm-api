@@ -6,11 +6,9 @@ Data is cached for up to 3 months
 """
 
 import sqlite3
-import json
-from json import JSONDecodeError
-import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
 import os
 import logging
 import re
@@ -20,7 +18,7 @@ logger = logging.getLogger(__name__)
 class CacheManager:
     """Manages local caching of PRIZM postal code data with individual columns"""
     
-    def __init__(self, db_path: str = "prizm_cache_v2.db", cache_duration_days: int = 90):
+    def __init__(self, db_path: str = None, cache_duration_days: int = None):
         """
         Initialize the cache manager
         
@@ -28,9 +26,23 @@ class CacheManager:
             db_path: Path to the SQLite database file
             cache_duration_days: Number of days to cache data (default: 90 days = 3 months)
         """
-        self.db_path = db_path
-        self.cache_duration_days = cache_duration_days
+        self.db_path = db_path or os.environ.get("PRIZM_CACHE_DB_PATH", "prizm_cache_v2.db")
+        self.cache_duration_days = cache_duration_days or int(os.environ.get("PRIZM_CACHE_DURATION_DAYS", "90"))
         self._init_database()
+
+    @contextmanager
+    def _connect(self):
+        conn = sqlite3.connect(self.db_path)
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    def _normalize_postal_code(self, postal_code: str) -> str:
+        compact = postal_code.strip().upper().replace(" ", "")
+        if len(compact) == 6 and re.fullmatch(r"[A-Z]\d[A-Z]\d[A-Z]\d", compact):
+            return f"{compact[:3]} {compact[3:]}"
+        return postal_code.strip().upper()
     
     def _parse_currency_to_int(self, value: Optional[str]) -> Optional[int]:
         """Convert currency string like '$95,199' to integer 95199."""
@@ -71,7 +83,11 @@ class CacheManager:
     def _init_database(self):
         """Initialize the SQLite database with the required table"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            db_dir = os.path.dirname(os.path.abspath(self.db_path))
+            if db_dir:
+                os.makedirs(db_dir, exist_ok=True)
+
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 # Create the cache table with individual columns
@@ -124,9 +140,9 @@ class CacheManager:
             Dict containing the cached data if found and valid, None otherwise
         """
         try:
-            postal_code = postal_code.strip().upper()
+            postal_code = self._normalize_postal_code(postal_code)
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 # Get the cached data if it exists and hasn't expired
@@ -202,7 +218,7 @@ class CacheManager:
             True if caching was successful, False otherwise
         """
         try:
-            postal_code = postal_code.strip().upper()
+            postal_code = self._normalize_postal_code(postal_code)
             
             # Remove cache metadata if present
             data_to_cache = data.copy()
@@ -249,7 +265,7 @@ class CacheManager:
             tenure = tenure if tenure and tenure != '' else None
             home_type = home_type if home_type and home_type != '' else None
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 # Insert or replace with individual columns
@@ -287,9 +303,9 @@ class CacheManager:
             True if confirmation was successful, False otherwise
         """
         try:
-            postal_code = postal_code.strip().upper()
+            postal_code = self._normalize_postal_code(postal_code)
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
@@ -323,9 +339,9 @@ class CacheManager:
             True if unconfirmation was successful, False otherwise
         """
         try:
-            postal_code = postal_code.strip().upper()
+            postal_code = self._normalize_postal_code(postal_code)
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
@@ -359,7 +375,7 @@ class CacheManager:
             List of unconfirmed entries
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
@@ -398,9 +414,9 @@ class CacheManager:
             String containing the HTML content if found, None otherwise
         """
         try:
-            postal_code = postal_code.strip().upper()
+            postal_code = self._normalize_postal_code(postal_code)
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
@@ -430,7 +446,7 @@ class CacheManager:
             Number of entries removed
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
@@ -458,7 +474,7 @@ class CacheManager:
             Dict containing cache statistics
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 # Get total entries
@@ -527,7 +543,7 @@ class CacheManager:
             True if successful, False otherwise
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM postal_code_cache")
                 deleted_count = cursor.rowcount
@@ -563,9 +579,9 @@ class CacheManager:
             True if deletion was successful, False otherwise
         """
         try:
-            postal_code = postal_code.strip().upper()
+            postal_code = self._normalize_postal_code(postal_code)
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
