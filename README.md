@@ -88,13 +88,24 @@ Recommended Railway variables:
 PRIZM_API_KEY=<set-this-and-send-it-from-salesforce>
 MAX_BATCH_POSTAL_CODES=10
 PRIZM_CACHE_DB_PATH=/data/prizm_cache_v2.db
-PRIZM_CACHE_DURATION_DAYS=90
+PRIZM_SUCCESS_CACHE_DAYS=3650
+PRIZM_INVALID_CACHE_DAYS=90
+PRIZM_ERROR_CACHE_DAYS=30
 WEB_CONCURRENCY=2
 GUNICORN_THREADS=4
 GUNICORN_TIMEOUT=60
 ```
 
 If you set `PRIZM_CACHE_DB_PATH=/data/...`, add a Railway volume mounted at `/data` so cached lookups survive redeploys. The cache is optional; the API works without a persistent volume.
+
+To preload Railway's persistent cache from the existing CSV export, run this in a Railway shell after the volume is mounted:
+
+```bash
+python cache_cli.py import-csv prizm_import_09112025.csv --replace
+python cache_cli.py stats
+```
+
+Successful lookups default to a 10-year cache, invalid postal-code formats default to 90 days, and cacheable not-found/error results default to 30 days. Upstream quota/network failures are not cached.
 
 When `PRIZM_API_KEY` is set, all `/api/*` routes require either:
 

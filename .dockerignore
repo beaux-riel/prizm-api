@@ -4,6 +4,7 @@ __pycache__
 *.pyc
 *.db
 *.csv
+!prizm_import_*.csv
 debug_screenshots
 node_modules
 .DS_Store

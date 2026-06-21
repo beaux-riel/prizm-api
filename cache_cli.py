@@ -4,9 +4,65 @@ CLI tool for managing the PRIZM API cache
 """
 
 import argparse
+import csv
 import json
 import sys
 from cache_manager_new import cache_manager
+
+
+IMPORT_FIELDS = [
+    "postal_code",
+    "segment_number",
+    "segment_name",
+    "segment_description",
+    "who_they_are",
+    "average_household_income",
+    "education",
+    "urbanity",
+    "average_household_net_worth",
+    "occupation",
+    "diversity",
+    "family_life",
+    "tenure",
+    "home_type",
+    "status",
+]
+
+
+def import_csv(path, success_days, invalid_days, error_days, replace):
+    imported = 0
+    skipped = 0
+    failed = 0
+
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            postal_code = (row.get("postal_code") or "").strip()
+            if not postal_code:
+                skipped += 1
+                continue
+
+            if not replace and cache_manager.is_cached(postal_code):
+                skipped += 1
+                continue
+
+            status = (row.get("status") or "error").strip().lower()
+            data = {field: (row.get(field) or "").strip() for field in IMPORT_FIELDS}
+            data["status"] = status
+
+            if status == "success":
+                duration_days = success_days
+            elif status == "invalid":
+                duration_days = invalid_days
+            else:
+                duration_days = error_days
+
+            if cache_manager.cache_data(postal_code, data, custom_duration_days=duration_days):
+                imported += 1
+            else:
+                failed += 1
+
+    return imported, skipped, failed
 
 
 def main():
@@ -14,10 +70,10 @@ def main():
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # Stats command
-    stats_parser = subparsers.add_parser('stats', help='Show cache statistics')
+    subparsers.add_parser('stats', help='Show cache statistics')
     
     # Cleanup command
-    cleanup_parser = subparsers.add_parser('cleanup', help='Clean up expired cache entries')
+    subparsers.add_parser('cleanup', help='Clean up expired cache entries')
     
     # Clear command
     clear_parser = subparsers.add_parser('clear', help='Clear all cache entries')
@@ -51,6 +107,14 @@ def main():
     # Migrate command
     migrate_parser = subparsers.add_parser('migrate', help='Migrate database to new schema')
     migrate_parser.add_argument('--no-backup', action='store_true', help='Skip creating backup')
+
+    # Import command
+    import_parser = subparsers.add_parser('import-csv', help='Import cached PRIZM results from a CSV export')
+    import_parser.add_argument('path', help='CSV file to import')
+    import_parser.add_argument('--success-days', type=int, default=3650, help='Cache duration for successful lookups')
+    import_parser.add_argument('--invalid-days', type=int, default=90, help='Cache duration for invalid postal codes')
+    import_parser.add_argument('--error-days', type=int, default=30, help='Cache duration for non-quota error results')
+    import_parser.add_argument('--replace', action='store_true', help='Replace existing valid cache entries')
     
     args = parser.parse_args()
     
@@ -71,7 +135,7 @@ def main():
             # Show status breakdown if available
             status_breakdown = stats.get('status_breakdown', {})
             if status_breakdown:
-                print(f"  Status breakdown:")
+                print("  Status breakdown:")
                 for status, count in status_breakdown.items():
                     print(f"    - {status}: {count}")
             
@@ -191,6 +255,18 @@ def main():
                 print("\n✅ Migration completed successfully!")
             else:
                 print("\n❌ Migration failed! Check the logs for details.")
+                return 1
+
+        elif args.command == 'import-csv':
+            imported, skipped, failed = import_csv(
+                args.path,
+                success_days=args.success_days,
+                invalid_days=args.invalid_days,
+                error_days=args.error_days,
+                replace=args.replace,
+            )
+            print(f"Imported {imported} rows, skipped {skipped}, failed {failed}")
+            if failed:
                 return 1
                 
     except Exception as e:

@@ -3,8 +3,8 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app import app
-from prizm_client import normalize_postal_code
+from app import app, cache_duration_for_result
+from prizm_client import PrizmLookupError, normalize_postal_code
 
 
 LOOKUP_RESULT = {
@@ -56,7 +56,23 @@ class TestPrizmAPI(unittest.TestCase):
         self.assertEqual(data["prizm_code"], "21")
         lookup.assert_called_once_with("V8A0A8")
         get_cached_data.assert_called_once_with("V8A 0A8")
-        cache_data.assert_called_once()
+        cache_data.assert_called_once_with("V8A 0A8", LOOKUP_RESULT, custom_duration_days=3650)
+
+    def test_cache_duration_for_result(self):
+        self.assertEqual(cache_duration_for_result({"status": "success"}), 3650)
+        self.assertEqual(cache_duration_for_result({"status": "invalid"}), 90)
+        self.assertEqual(cache_duration_for_result({"status": "error"}), 30)
+
+    @patch("app.cache_manager.cache_data", return_value=True)
+    @patch("app.cache_manager.get_cached_data", return_value=None)
+    @patch("app.prizm_client.lookup", side_effect=PrizmLookupError("quota exceeded"))
+    def test_upstream_exceptions_are_not_cached(self, _lookup, _get_cached_data, cache_data):
+        response = self.client.get("/api/prizm?postal_code=V8A0A8")
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["status"], "error")
+        cache_data.assert_not_called()
 
     @patch("app.cache_manager.cache_data", return_value=True)
     @patch("app.cache_manager.get_cached_data", return_value=None)

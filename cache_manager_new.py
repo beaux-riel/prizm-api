@@ -44,8 +44,8 @@ class CacheManager:
             return f"{compact[:3]} {compact[3:]}"
         return postal_code.strip().upper()
     
-    def _parse_currency_to_int(self, value: Optional[str]) -> Optional[int]:
-        """Convert currency string like '$95,199' to integer 95199."""
+    def _parse_currency_to_int(self, value: Optional[str]) -> Optional[Any]:
+        """Convert simple currency strings to integers; keep ranges as text."""
         if not value or value == '' or value == 'Unknown':
             return None
         
@@ -55,13 +55,14 @@ class CacheManager:
         try:
             return int(cleaned)
         except (ValueError, TypeError):
-            logger.warning(f"Could not parse currency value: {value}")
-            return None
+            return str(value).strip()
     
-    def _format_currency_from_int(self, value: Optional[int]) -> Optional[str]:
-        """Convert integer 95199 to currency string '$95,199'."""
+    def _format_currency_from_int(self, value: Optional[Any]) -> Optional[str]:
+        """Convert integer 95199 to '$95,199'; return range labels unchanged."""
         if value is None:
             return None
+        if isinstance(value, str):
+            return value if value.startswith("$") else f"${value}"
         
         # Format with comma separators and dollar sign
         return f"${value:,}"
