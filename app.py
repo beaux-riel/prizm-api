@@ -18,6 +18,15 @@ app = Flask(__name__)
 prizm_client = PrizmClient()
 
 
+def cache_duration_for_result(result: Dict[str, Any]) -> int:
+    status = result.get("status")
+    if status == "success":
+        return int(os.environ.get("PRIZM_SUCCESS_CACHE_DAYS", "3650"))
+    if status == "invalid":
+        return int(os.environ.get("PRIZM_INVALID_CACHE_DAYS", "90"))
+    return int(os.environ.get("PRIZM_ERROR_CACHE_DAYS", "30"))
+
+
 @app.before_request
 def require_api_key():
     expected_key = os.environ.get("PRIZM_API_KEY")
@@ -84,7 +93,7 @@ def get_prizm_code(postal_code: str) -> Dict[str, Any]:
         }
 
     if should_cache:
-        cache_duration = 7 if result["status"] == "error" else None
+        cache_duration = cache_duration_for_result(result)
         cache_manager.cache_data(cache_key, result, custom_duration_days=cache_duration)
     return result
 
