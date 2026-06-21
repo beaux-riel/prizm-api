@@ -15,7 +15,7 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     ElementClickInterceptedException,
 )
-from cache_manager import cache_manager
+from cache_manager_new import cache_manager
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -242,6 +242,14 @@ def get_segment_number(driver, postal_code):
             error_text = error_element.text.strip()
             print(f"Found error message: {error_text}")
             
+            # Capture HTML content for invalid postal code debugging
+            invalid_html_content = None
+            try:
+                invalid_html_content = driver.page_source
+                print(f"Captured invalid postal code HTML for {postal_code} ({len(invalid_html_content)} characters)")
+            except:
+                pass
+            
             # Return error result for invalid postal code
             error_result = {
                 "postal_code": postal_code, 
@@ -263,8 +271,8 @@ def get_segment_number(driver, postal_code):
             
             # Cache the invalid postal code result to avoid future API calls
             # Use full cache duration since invalid postal codes won't become valid
-            if cache_manager.cache_data(postal_code, error_result):
-                logger.info(f"Successfully cached invalid postal code result for: {postal_code}")
+            if cache_manager.cache_data(postal_code, error_result, html_content=invalid_html_content):
+                logger.info(f"Successfully cached invalid postal code result with HTML for: {postal_code}")
             else:
                 logger.warning(f"Failed to cache invalid postal code result for: {postal_code}")
             
@@ -278,6 +286,10 @@ def get_segment_number(driver, postal_code):
             EC.presence_of_element_located((By.ID, "segment-details"))
         )
         driver.save_screenshot("debug_screenshots/results_page.png")
+        
+        # Capture HTML content after results load
+        html_content = driver.page_source
+        print(f"Captured HTML content for {postal_code} ({len(html_content)} characters)")
 
         # Find segment details container first
         segment_details = None
@@ -357,9 +369,9 @@ def get_segment_number(driver, postal_code):
             "status": "success"
         }
         
-        # Cache the successful result
-        if cache_manager.cache_data(postal_code, result):
-            logger.info(f"Successfully cached data for postal code: {postal_code}")
+        # Cache the successful result with HTML content
+        if cache_manager.cache_data(postal_code, result, html_content=html_content):
+            logger.info(f"Successfully cached data with HTML for postal code: {postal_code}")
         else:
             logger.warning(f"Failed to cache data for postal code: {postal_code}")
         
@@ -367,6 +379,15 @@ def get_segment_number(driver, postal_code):
 
     except Exception as e:
         driver.save_screenshot(f"debug_screenshots/error_{postal_code.replace(' ', '_')}.png")
+        
+        # Capture HTML content during error for debugging
+        error_html_content = None
+        try:
+            error_html_content = driver.page_source
+            print(f"Captured error HTML content for {postal_code} ({len(error_html_content)} characters)")
+        except:
+            pass
+        
         error_result = {
             "postal_code": postal_code, 
             "segment_number": None,
@@ -387,8 +408,8 @@ def get_segment_number(driver, postal_code):
         
         # Cache the error result to avoid future API calls for the same issue
         # Use shorter cache duration (7 days) for general errors as they might be temporary (network issues, etc.)
-        if cache_manager.cache_data(postal_code, error_result, custom_duration_days=7):
-            logger.info(f"Successfully cached error result for: {postal_code} (7-day duration)")
+        if cache_manager.cache_data(postal_code, error_result, custom_duration_days=7, html_content=error_html_content):
+            logger.info(f"Successfully cached error result with HTML for: {postal_code} (7-day duration)")
         else:
             logger.warning(f"Failed to cache error result for: {postal_code}")
         

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class CacheManager:
     """Manages local caching of PRIZM postal code data"""
     
-    def __init__(self, db_path: str = "prizm_cache.db", cache_duration_days: int = 90):
+    def __init__(self, db_path: str = "prizm_cache_v2.db", cache_duration_days: int = 90):
         """
         Initialize the cache manager
         
@@ -30,6 +30,7 @@ class CacheManager:
         self.db_path = db_path
         self.cache_duration_days = cache_duration_days
         self._init_database()
+        self._migrate_database_for_html()
     
     def _init_database(self):
         """Initialize the SQLite database with the required table"""
@@ -60,6 +61,28 @@ class CacheManager:
             logger.error(f"Failed to initialize cache database: {e}")
             raise
     
+    def _migrate_database_for_html(self):
+        """Add html_content column if it doesn't exist"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Check if html_content column exists
+                cursor.execute("PRAGMA table_info(postal_code_cache)")
+                columns = [column[1] for column in cursor.fetchall()]
+                
+                if 'html_content' not in columns:
+                    cursor.execute("""
+                        ALTER TABLE postal_code_cache 
+                        ADD COLUMN html_content TEXT
+                    """)
+                    conn.commit()
+                    logger.info("Added html_content column to postal_code_cache table")
+                    
+        except sqlite3.Error as e:
+            logger.error(f"Failed to migrate database for HTML storage: {e}")
+            # Don't raise here, allow the app to continue without HTML storage
+    
     def get_cached_data(self, postal_code: str) -> Optional[Dict[Any, Any]]:
         """
         Retrieve cached data for a postal code if it exists and hasn't expired
@@ -77,8 +100,14 @@ class CacheManager:
                 cursor = conn.cursor()
                 
                 # Get the cached data if it exists and hasn't expired
+                # Try to get html_content column if it exists
                 cursor.execute("""
-                    SELECT data, cached_at 
+                    SELECT data, cached_at, 
+                           CASE 
+                               WHEN EXISTS (SELECT 1 FROM pragma_table_info('postal_code_cache') WHERE name='html_content')
+                               THEN html_content 
+                               ELSE NULL 
+                           END as html_content
                     FROM postal_code_cache 
                     WHERE postal_code = ? AND expires_at > datetime('now')
                 """, (postal_code,))
@@ -86,7 +115,7 @@ class CacheManager:
                 result = cursor.fetchone()
                 
                 if result:
-                    data_json, cached_at = result
+                    data_json, cached_at, html_content = result
                     cached_data = json.loads(data_json)
                     
                     logger.info(f"Cache hit for postal code {postal_code} (cached at {cached_at})")
@@ -94,7 +123,8 @@ class CacheManager:
                     # Add cache metadata
                     cached_data['_cache_info'] = {
                         'cached_at': cached_at,
-                        'from_cache': True
+                        'from_cache': True,
+                        'has_html': html_content is not None and len(html_content) > 0
                     }
                     
                     return cached_data
@@ -106,7 +136,7 @@ class CacheManager:
             logger.error(f"Error retrieving cached data for {postal_code}: {e}")
             return None
     
-    def cache_data(self, postal_code: str, data: Dict[Any, Any], custom_duration_days: Optional[int] = None) -> bool:
+    def cache_data(self, postal_code: str, data: Dict[Any, Any], custom_duration_days: Optional[int] = None, html_content: Optional[str] = None) -> bool:
         """
         Cache data for a postal code
         
@@ -114,6 +144,7 @@ class CacheManager:
             postal_code: The postal code
             data: The data to cache (will be JSON serialized)
             custom_duration_days: Optional custom cache duration in days. If None, uses default duration.
+            html_content: Optional HTML content to cache alongside the data
             
         Returns:
             True if caching was successful, False otherwise
@@ -132,21 +163,76 @@ class CacheManager:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 
-                # Insert or replace the cached data
-                cursor.execute("""
-                    INSERT OR REPLACE INTO postal_code_cache 
-                    (postal_code, data, expires_at) 
-                    VALUES (?, ?, ?)
-                """, (postal_code, json.dumps(data_to_cache), expires_at))
+                # Check if html_content column exists
+                cursor.execute("PRAGMA table_info(postal_code_cache)")
+                columns = [column[1] for column in cursor.fetchall()]
+                
+                if 'html_content' in columns and html_content is not None:
+                    # Insert or replace with HTML content
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO postal_code_cache 
+                        (postal_code, data, html_content, expires_at) 
+                        VALUES (?, ?, ?, ?)
+                    """, (postal_code, json.dumps(data_to_cache), html_content, expires_at))
+                else:
+                    # Insert or replace without HTML content (backwards compatibility)
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO postal_code_cache 
+                        (postal_code, data, expires_at) 
+                        VALUES (?, ?, ?)
+                    """, (postal_code, json.dumps(data_to_cache), expires_at))
                 
                 conn.commit()
                 
-                logger.info(f"Cached data for postal code {postal_code} (expires: {expires_at}, duration: {duration_days} days)")
+                logger.info(f"Cached data for postal code {postal_code} (expires: {expires_at}, duration: {duration_days} days, has_html: {html_content is not None})")
                 return True
                 
         except (sqlite3.Error, JSONDecodeError) as e:
             logger.error(f"Error caching data for {postal_code}: {e}")
             return False
+    
+    def get_cached_html(self, postal_code: str) -> Optional[str]:
+        """
+        Retrieve cached HTML content for a postal code if it exists
+        
+        Args:
+            postal_code: The postal code to look up
+            
+        Returns:
+            String containing the HTML content if found, None otherwise
+        """
+        try:
+            postal_code = postal_code.strip().upper()
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Check if html_content column exists
+                cursor.execute("PRAGMA table_info(postal_code_cache)")
+                columns = [column[1] for column in cursor.fetchall()]
+                
+                if 'html_content' not in columns:
+                    return None
+                
+                # Get the cached HTML if it exists and hasn't expired
+                cursor.execute("""
+                    SELECT html_content 
+                    FROM postal_code_cache 
+                    WHERE postal_code = ? AND expires_at > datetime('now')
+                """, (postal_code,))
+                
+                result = cursor.fetchone()
+                
+                if result and result[0]:
+                    logger.info(f"HTML cache hit for postal code {postal_code}")
+                    return result[0]
+                else:
+                    logger.info(f"HTML cache miss for postal code {postal_code}")
+                    return None
+                    
+        except sqlite3.Error as e:
+            logger.error(f"Error retrieving cached HTML for {postal_code}: {e}")
+            return None
     
     def cleanup_expired_cache(self) -> int:
         """

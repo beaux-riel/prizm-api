@@ -5,8 +5,8 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-      - CHROME_BIN=/usr/bin/chromium
-      - CHROMEDRIVER_PATH=/usr/bin/chromedriver
+      - MAX_BATCH_POSTAL_CODES=10
     volumes:
       - ./templates:/app/templates
+      - ./prizm_cache_v2.db:/app/prizm_cache_v2.db
     restart: unless-stopped
