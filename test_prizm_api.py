@@ -98,11 +98,16 @@ class TestPrizmAPI(unittest.TestCase):
         response = self.client.post("/api/prizm/batch", json={"postal_codes": ["V8A0A8"] * 11})
         self.assertEqual(response.status_code, 400)
 
-    def test_optional_api_key_protection(self):
+    def test_api_key_protects_all_routes_except_health(self):
         os.environ["PRIZM_API_KEY"] = "secret"
         try:
-            response = self.client.get("/api/segments")
-            self.assertEqual(response.status_code, 401)
+            self.assertEqual(self.client.get("/").status_code, 401)
+            self.assertEqual(self.client.get("/api/segments").status_code, 401)
+
+            self.assertEqual(self.client.get("/health").status_code, 200)
+            self.assertEqual(
+                self.client.get("/", headers={"X-API-Key": "secret"}).status_code, 200
+            )
 
             with patch("app.prizm_client.get_all_segments", return_value=[]):
                 response = self.client.get("/api/segments", headers={"X-API-Key": "secret"})
