@@ -107,6 +107,9 @@ class TestPrizmAPI(unittest.TestCase):
             with patch("app.prizm_client.get_all_segments", return_value=[]):
                 response = self.client.get("/api/segments", headers={"X-API-Key": "secret"})
             self.assertEqual(response.status_code, 200)
+
+            self.assertEqual(self.client.get("/").status_code, 401)
+            self.assertEqual(self.client.get("/health").status_code, 200)
         finally:
             os.environ.pop("PRIZM_API_KEY", None)
 
