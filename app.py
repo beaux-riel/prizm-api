@@ -30,7 +30,7 @@ def cache_duration_for_result(result: Dict[str, Any]) -> int:
 @app.before_request
 def require_api_key():
     expected_key = os.environ.get("PRIZM_API_KEY")
-    if not expected_key or not request.path.startswith("/api/") or request.method == "OPTIONS":
+    if not expected_key or request.path == "/health" or request.method == "OPTIONS":
         return None
 
     provided_key = request.headers.get("X-API-Key")
