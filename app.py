@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request
 
 from cache_manager_new import cache_manager
 from prizm_client import PrizmClient, PrizmLookupError, normalize_postal_code
@@ -100,20 +100,17 @@ def get_prizm_code(postal_code: str) -> Dict[str, Any]:
 
 @app.route("/")
 def home():
-    try:
-        return render_template("index.html")
-    except Exception:
-        return jsonify(
-            {
-                "name": "PRIZM Code Lookup API",
-                "status": "ok",
-                "endpoints": {
-                    "single": "GET /api/prizm?postal_code=V8A0A8",
-                    "batch": "POST /api/prizm/batch",
-                    "health": "GET /health",
-                },
-            }
-        )
+    return jsonify(
+        {
+            "name": "PRIZM Code Lookup API",
+            "status": "ok",
+            "endpoints": {
+                "single": "GET /api/prizm?postal_code=V8A0A8",
+                "batch": "POST /api/prizm/batch",
+                "health": "GET /health",
+            },
+        }
+    )
 
 
 @app.route("/health", methods=["GET"])
