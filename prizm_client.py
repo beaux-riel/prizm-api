@@ -5,6 +5,8 @@ from typing import Any, Dict, Optional
 
 import requests
 
+from segment_net_worth import average_household_net_worth, average_household_net_worth_amount
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_GEOCODER_API_URL = "https://api.environicsanalytics.com/geocoder-openauth"
@@ -199,7 +201,8 @@ class PrizmClient:
             "average_household_income": format_currency(segment.get("Average Income")),
             "education": segment.get("Education") or "",
             "urbanity": segment.get("Urbanity") or "",
-            "average_household_net_worth": "",
+            "average_household_net_worth": average_household_net_worth(segment_number),
+            "average_household_net_worth_amount": average_household_net_worth_amount(segment_number),
             "occupation": segment.get("Job Type") or "",
             "diversity": segment.get("Cultural Diversity Index") or "",
             "family_life": segment.get("Family Status") or "",
@@ -236,6 +239,8 @@ class PrizmClient:
             "segment_name": row.get("PRIZM Name") or "",
             "segment_description": row.get("PRIZM Descriptor") or "",
             "average_household_income": format_currency(row.get("Average Income")),
+            "average_household_net_worth": average_household_net_worth(segment_number),
+            "average_household_net_worth_amount": average_household_net_worth_amount(segment_number),
             "education": row.get("Education") or "",
             "urbanity": row.get("Urbanity") or "",
             "occupation": row.get("Job Type") or "",

@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from app import app, cache_duration_for_result
-from prizm_client import PrizmLookupError, normalize_postal_code
+from prizm_client import PrizmClient, PrizmLookupError, normalize_postal_code
 
 
 LOOKUP_RESULT = {
@@ -16,7 +16,8 @@ LOOKUP_RESULT = {
     "average_household_income": "$140,223",
     "education": "High School/College",
     "urbanity": "Suburban",
-    "average_household_net_worth": "",
+    "average_household_net_worth": "$1M to $2.15M",
+    "average_household_net_worth_amount": 1255437,
     "occupation": "Mix",
     "diversity": "Low",
     "family_life": "Couples/Families",
@@ -62,6 +63,22 @@ class TestPrizmAPI(unittest.TestCase):
         self.assertEqual(cache_duration_for_result({"status": "success"}), 3650)
         self.assertEqual(cache_duration_for_result({"status": "invalid"}), 90)
         self.assertEqual(cache_duration_for_result({"status": "error"}), 30)
+
+    def test_new_lookup_includes_known_net_worth(self):
+        client = PrizmClient()
+        response = client._build_response(
+            "V8A 2P4",
+            62,
+            {
+                "PRIZM Name": "Down to Earth",
+                "PRIZM Descriptor": "Older, lower-middle-income suburban singles",
+                "Average Income": "95199",
+            },
+            {"geography": {}, "attributes": {}},
+        )
+
+        self.assertEqual(response["average_household_net_worth"], "$0 to $600K")
+        self.assertEqual(response["average_household_net_worth_amount"], 461727)
 
     @patch("app.cache_manager.cache_data", return_value=True)
     @patch("app.cache_manager.get_cached_data", return_value=None)
@@ -112,6 +129,9 @@ class TestPrizmAPI(unittest.TestCase):
             with patch("app.prizm_client.get_all_segments", return_value=[]):
                 response = self.client.get("/api/segments", headers={"X-API-Key": "secret"})
             self.assertEqual(response.status_code, 200)
+
+            self.assertEqual(self.client.get("/").status_code, 401)
+            self.assertEqual(self.client.get("/health").status_code, 200)
         finally:
             os.environ.pop("PRIZM_API_KEY", None)
 
