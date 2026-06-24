@@ -29,6 +29,10 @@ AVERAGE_HOUSEHOLD_NET_WORTH_BY_SEGMENT = {
     21: 1255437,
     22: 988892,
     23: 973823,
+    # PRIZM 2020 guide, segment 24 All-Terrain Families. The current Supabase
+    # reference table omits net worth; this keeps Salesforce picklist mapping
+    # populated for postal codes assigned to this segment.
+    24: 334508,
     25: 916822,
     28: 640083,
     30: 780256,
