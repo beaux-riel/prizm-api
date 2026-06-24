@@ -7,6 +7,7 @@ from flask import Flask, jsonify, request
 
 from cache_manager_new import cache_manager
 from prizm_client import PrizmClient, PrizmLookupError, normalize_postal_code
+from segment_net_worth import average_household_net_worth, average_household_net_worth_amount
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -47,6 +48,12 @@ def api_response_from_cache(cached_data: Dict[str, Any]) -> Dict[str, Any]:
     response = cached_data.copy()
     segment_number = response.get("segment_number")
     response["prizm_code"] = segment_number or "Unknown"
+    if segment_number:
+        net_worth_amount = average_household_net_worth_amount(segment_number)
+        if net_worth_amount is not None:
+            response["average_household_net_worth_amount"] = net_worth_amount
+        if not response.get("average_household_net_worth"):
+            response["average_household_net_worth"] = average_household_net_worth(segment_number)
 
     if response.get("status") == "invalid":
         response["prizm_code"] = "Unknown"
