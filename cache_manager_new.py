@@ -14,7 +14,7 @@ import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
