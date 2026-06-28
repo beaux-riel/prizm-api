@@ -92,6 +92,8 @@ python send_weekly_report.py
 
 Railway evaluates native cron schedules in UTC; Monday 8am Vancouver is `0 15 * * 1` during PDT.
 
+For Wilderness Committee Salesforce delivery, `WCPrizmWeeklyReportEmail` can be scheduled instead. It calls `/api/reports/weekly` with the configured API key/custom label and sends the plain-text report via Salesforce email. The deployed production schedule is `0 0 8 ? * MON` (`WC PRIZM Weekly Report`).
+
 ## Example Response
 
 ```json
