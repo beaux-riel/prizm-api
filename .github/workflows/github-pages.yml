@@ -23,7 +23,9 @@ jobs:
       - name: Copy static files
         run: |
           mkdir -p _site
-          cp -r templates/* _site/
+          if [ -d templates ] && [ "$(find templates -mindepth 1 -maxdepth 1 | wc -l)" -gt 0 ]; then
+            cp -r templates/* _site/
+          fi
           # Use the static version of index.html
           if [ -f _site/index.html.static ]; then
             mv _site/index.html.static _site/index.html
