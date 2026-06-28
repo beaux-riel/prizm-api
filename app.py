@@ -80,7 +80,7 @@ DASHBOARD_HTML = """<!doctype html>
   </div>
   <div class="card toolbar">
     <a class="button primary" href="/api/cache/export.csv">Export cached data CSV</a>
-    <button id="sendReport">Send weekly report email</button>
+    <button id="sendReport">Preview weekly report</button>
     <span id="reportStatus" class="muted"></span>
   </div>
 
@@ -150,11 +150,11 @@ async function loadRows() {
 }
 async function sendReport() {
   const status = document.getElementById('reportStatus');
-  status.textContent = 'Sending…';
+  status.textContent = 'Loading preview…';
   try {
-    const data = await fetchJson('/api/reports/weekly/send', { method: 'POST' });
-    status.textContent = `Sent to ${data.recipients?.join(', ') || 'configured recipients'}.`;
-  } catch (err) { status.textContent = 'Report not sent: ' + err.message; }
+    const data = await fetchJson('/api/reports/weekly');
+    status.textContent = data.body || 'No report body returned.';
+  } catch (err) { status.textContent = 'Report preview unavailable: ' + err.message; }
 }
 document.getElementById('refresh').addEventListener('click', () => { loadSummary(); loadRows(); });
 document.getElementById('sendReport').addEventListener('click', sendReport);
@@ -226,7 +226,7 @@ def require_authentication():
     if request.path == "/health" or request.method == "OPTIONS":
         return None
 
-    dashboard_paths = {"/", "/dashboard", "/api/dashboard/summary", "/api/cache/entries", "/api/cache/export.csv", "/api/reports/weekly/send"}
+    dashboard_paths = {"/", "/dashboard", "/api/dashboard/summary", "/api/cache/entries", "/api/cache/export.csv", "/api/reports/weekly", "/api/reports/weekly/send"}
     if request.path in dashboard_paths:
         if has_valid_dashboard_auth() or has_valid_api_key():
             return None
