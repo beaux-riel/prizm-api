@@ -19,6 +19,30 @@ This app now uses those APIs directly instead of Selenium/Chromium, which makes 
 GET /health
 ```
 
+### Password-protected Dashboard
+
+```http
+GET /dashboard
+```
+
+The dashboard shows cache totals, recent daily additions, recent failures, searchable cached postal-code data, CSV export, and a manual weekly-report send button. It uses HTTP Basic Auth.
+
+Recommended dashboard/reporting variables:
+
+```bash
+DASHBOARD_USERNAME=dena
+DASHBOARD_PASSWORD=<set a dashboard password>
+WEEKLY_REPORT_RECIPIENTS=dena@example.org
+SMTP_HOST=<smtp host>
+SMTP_PORT=587
+SMTP_USERNAME=<smtp username>
+SMTP_PASSWORD=<smtp password>
+SMTP_FROM=<sender email>
+SMTP_STARTTLS=1
+```
+
+If `DASHBOARD_PASSWORD` is not set, the dashboard can temporarily use `PRIZM_API_KEY` as the password unless `ALLOW_API_KEY_AS_DASHBOARD_PASSWORD=0` is set.
+
 ### Single Lookup
 
 ```http
@@ -45,6 +69,28 @@ GET /api/segments
 ```
 
 Useful if you want the full segment reference data without postal-code lookup.
+
+### Cache Entries and CSV Export
+
+```http
+GET /api/cache/entries?status=success&search=V8A&limit=500
+GET /api/cache/export.csv
+```
+
+### Weekly Report
+
+```http
+GET /api/reports/weekly
+POST /api/reports/weekly/send
+```
+
+For Railway weekly email delivery, create a cron service/worker that runs:
+
+```bash
+python send_weekly_report.py
+```
+
+Railway evaluates native cron schedules in UTC; Monday 8am Vancouver is `0 15 * * 1` during PDT.
 
 ## Example Response
 

@@ -1,0 +1,11 @@
+{
+  "packageDirectories": [
+    {
+      "path": "salesforce",
+      "default": true
+    }
+  ],
+  "name": "prizm-api-salesforce",
+  "namespace": "",
+  "sourceApiVersion": "67.0"
+}
